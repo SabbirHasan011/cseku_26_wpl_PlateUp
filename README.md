@@ -71,7 +71,7 @@ The platform combines a surplus food marketplace with AI-powered decision suppor
 |-----------|------------|
 | Frontend | React.js |
 | Styling | Tailwind CSS |
-| Backend | Django |
+| Backend | Node.js |
 | API | Django REST Framework |
 | Database | PostgreSQL |
 | AI/ML | Python + Scikit-learn |
@@ -91,7 +91,7 @@ The platform combines a surplus food marketplace with AI-powered decision suppor
                        │
                  React Frontend
                        │
-             Django REST Framework
+                    Node.js backend
                        │
               ┌────────┴────────┐
               │                 │
