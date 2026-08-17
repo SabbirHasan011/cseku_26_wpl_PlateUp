@@ -111,7 +111,7 @@ The platform combines a surplus food marketplace with AI-powered decision suppor
 - [ ] Set up GitHub repository and contribution guidelines
 - [ ] Set up Node.js, React.js, and PostgreSQL environment
 - [ ] Design initial UI/UX prototypes
-- [ ] Define REST API structure
+- [ ] Define API structure
 - [ ] Define AI/ML requirements and workflow
 - [ ] Create initial project roadmap
 - [ ] Assign tasks and responsibilities among team members
