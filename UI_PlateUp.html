@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlateUp — AI-Powered Surplus Food Marketplace</title>
+<style>
+  :root {
+    --ink: #16241C;
+    --ink-soft: #3E4A3F;
+    --paper: #F2F4EC;
+    --card: #FFFFFF;
+    --line: #DCE1D2;
+    --green-900: #1B4332;
+    --green-700: #2F6B4F;
+    --green-600: #3C7D5D;
+    --green-100: #DCE8DD;
+    --green-50: #EFF4E9;
+    --amber-700: #9A6218;
+    --amber-600: #E3A23D;
+    --amber-100: #FBEBD2;
+    --coral-700: #8C2E20;
+    --coral-600: #D9614F;
+    --coral-100: #F8DED9;
+    --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+    --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-body); }
+  .app { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* Navigation & Topbar */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+  .logo { display: flex; align-items: baseline; gap: 8px; }
+  .logo-mark { font-family: var(--font-display); font-size: 30px; font-weight: 700; color: var(--green-900); letter-spacing: -0.5px; }
+  .logo-tag { font-size: 12px; color: var(--ink-soft); letter-spacing: 0.06em; text-transform: uppercase; border-left: 1px solid var(--line); padding-left: 8px; }
+  .top-controls { display: flex; gap: 12px; align-items: center; }
+  .switch { display: flex; background: var(--green-100); border-radius: 999px; padding: 4px; gap: 2px; }
+  .switch button { border: none; background: transparent; padding: 8px 18px; border-radius: 999px; font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--green-900); cursor: pointer; transition: all 0.2s; }
+  .switch button.active { background: var(--green-900); color: #fff; }
+  .cart-chip { background: var(--amber-600); color: #432B04; font-weight: 700; border-radius: 999px; padding: 8px 16px; font-size: 13px; cursor: pointer; border: none; display: flex; align-items: center; gap: 6px; }
+  
+  .user-badge { background: var(--green-100); color: var(--green-900); padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; font-family: var(--font-mono); border: 1px solid var(--green-700); }
+  .logout-btn { background: var(--coral-100); color: var(--coral-700); border: 1px solid var(--coral-600); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 12px; cursor: pointer; }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* Login / Authentication Screen */
+  .auth-container { max-width: 420px; margin: 40px auto; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); }
+  .auth-header { text-align: center; margin-bottom: 24px; }
+  .auth-header h2 { font-family: var(--font-display); font-size: 26px; margin: 0 0 6px; color: var(--green-900); }
+  .auth-header p { font-size: 13px; color: var(--ink-soft); margin: 0; }
+  
+  .role-picker { display: flex; gap: 8px; margin-bottom: 20px; }
+  .role-opt { flex: 1; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); text-align: center; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .role-opt.selected { background: var(--green-900); color: #fff; border-color: var(--green-900); }
+
+  .btn-submit { width: 100%; background: var(--green-900); color: #fff; border: none; padding: 12px; border-radius: 9px; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
+  .btn-submit:hover { background: var(--green-700); }
+
+  /* Hero Section */
+  .hero { background: var(--green-900); color: #fff; border-radius: 20px; padding: 32px; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .hero h1 { font-family: var(--font-display); font-size: 32px; font-weight: 700; margin: 0 0 8px; }
+  .hero p { margin: 0 0 20px; color: #CFE3D4; font-size: 14.5px; max-width: 480px; }
+  .search-row { display: flex; gap: 10px; background: #fff; border-radius: 12px; padding: 6px; max-width: 650px; }
+  .search-row input { border: none; outline: none; flex: 1; padding: 10px 12px; font-size: 14px; font-family: var(--font-body); color: var(--ink); }
+  .search-row input:first-child { border-right: 1px solid var(--line); flex: 0.8; }
+  .search-row button { border: none; background: var(--amber-600); color: #432B04; font-weight: 700; font-size: 13.5px; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
+  .rescue-stat { margin-top: 18px; font-family: var(--font-mono); font-size: 12.5px; color: #AFCBB6; }
+  .rescue-stat b { color: var(--amber-600); }
+
+  /* Filters & View Controls */
+  .filter-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; transition: all 0.2s; }
+  .chip.on { background: var(--green-900); border-color: var(--green-900); color: #fff; }
+  .view-toggle { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
+  .view-toggle button { border: none; background: transparent; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+  .view-toggle button.active { background: var(--green-100); color: var(--green-900); }
+
+  /* Card Grid Layout */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 30px; }
+  .food-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.15s, box-shadow 0.15s; }
+  .food-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.06); }
+  .food-thumb { height: 110px; background: var(--green-50); display: flex; align-items: center; justify-content: center; position: relative; border-bottom: 1px solid var(--line); }
+  .food-thumb .initial { font-family: var(--font-display); font-size: 34px; color: var(--green-700); opacity: 0.55; }
+  .urgency { position: absolute; top: 10px; left: 10px; background: var(--coral-100); color: var(--coral-700); font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; font-family: var(--font-mono); }
+  .ai-tag { position: absolute; top: 10px; right: 10px; background: var(--green-100); color: var(--green-900); font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; font-family: var(--font-mono); }
+  .food-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .biz-line { font-size: 11.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+  .food-title { font-size: 15px; font-weight: 700; margin: 0; line-height: 1.3; }
+  .food-meta { font-size: 12px; color: var(--ink-soft); }
+
+  .ticket { margin-top: auto; border-top: 1px dashed var(--line); padding-top: 10px; display: flex; align-items: flex-end; justify-content: space-between; }
+  .price-block { display: flex; flex-direction: column; }
+  .orig-price { font-family: var(--font-mono); font-size: 12px; color: #9AA394; text-decoration: line-through; }
+  .rescue-price { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--green-900); }
+  .save-pill { background: var(--amber-100); color: var(--amber-700); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-family: var(--font-mono); }
+  .reserve-btn { width: 100%; margin-top: 12px; background: var(--green-900); color: #fff; border: none; padding: 10px; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; transition: background 0.2s; }
+  .reserve-btn:hover { background: var(--green-700); }
+
+  /* Map Container View */
+  .map-container { display: none; background: var(--card); border: 1px solid var(--line); border-radius: 16px; height: 420px; position: relative; margin-bottom: 30px; overflow: hidden; }
+  .map-bg { width: 100%; height: 100%; background: #E4ECE3; display: flex; align-items: center; justify-content: center; color: var(--green-700); font-family: var(--font-mono); }
+  .map-pin { position: absolute; background: var(--green-900); color: #fff; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); cursor: pointer; }
+
+  /* Business Dashboard */
+  .dash { display: grid; grid-template-columns: 220px 1fr; gap: 24px; }
+  .sidebar { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 14px; height: fit-content; }
+  .biz-id { display: flex; align-items: center; gap: 10px; padding: 6px 8px 16px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .biz-avatar { width: 38px; height: 38px; border-radius: 10px; background: var(--green-900); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--font-display); }
+  .biz-name { font-size: 13.5px; font-weight: 700; }
+  .biz-role { font-size: 11px; color: var(--ink-soft); }
+  .navitem { display: block; padding: 9px 10px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 2px; cursor: pointer; }
+  .navitem.on { background: var(--green-100); color: var(--green-900); }
+  .newlist-btn { width: 100%; margin-top: 14px; background: var(--amber-600); color: #432B04; border: none; padding: 10px; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; }
+  .stat-label { font-size: 11.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; margin-bottom: 6px; }
+  .stat-value { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--green-900); }
+
+  .ml-card { background: var(--green-900); color: #fff; border-radius: 16px; padding: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+  .ml-card .label { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #AFCBB6; font-weight: 700; margin-bottom: 4px; }
+  .ml-card .headline { font-family: var(--font-display); font-size: 17px; margin: 0 0 4px; }
+  .ml-card .sub { font-size: 12.5px; color: #CFE3D4; }
+  .ml-conf { font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: var(--amber-600); text-align: right; }
+
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; margin-bottom: 20px; }
+  .panel h3 { font-family: var(--font-display); font-size: 16px; margin: 0 0 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); padding-bottom: 8px; border-bottom: 1px solid var(--line); font-weight: 700; }
+  td { padding: 10px 6px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  .badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; font-family: var(--font-mono); }
+  .badge.active { background: var(--green-100); color: var(--green-900); }
+  .badge.low { background: var(--amber-100); color: var(--amber-700); }
+  .badge.sold { background: var(--coral-100); color: var(--coral-700); }
+  .rowprice { font-family: var(--font-mono); font-weight: 700; }
+
+  .chart { display: flex; align-items: flex-end; gap: 14px; height: 150px; padding-top: 10px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .bar { width: 100%; background: var(--green-600); border-radius: 6px 6px 0 0; }
+  .bar-day { font-size: 11px; color: var(--ink-soft); margin-top: 6px; font-family: var(--font-mono); }
+  .bar-val { font-size: 11px; font-family: var(--font-mono); color: var(--green-900); font-weight: 700; margin-bottom: 4px; }
+
+  /* Modals */
+  .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.4); justify-content: center; align-items: center; z-index: 1000; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--card); border-radius: 16px; padding: 24px; width: 100%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+  .modal h3 { font-family: var(--font-display); font-size: 20px; margin: 0 0 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; font-family: var(--font-body); font-size: 13.5px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  .btn-sec { background: var(--paper); border: 1px solid var(--line); padding: 10px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  .btn-pri { background: var(--green-900); color: #fff; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+
+  @media(max-width: 860px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    .dash { grid-template-columns: 1fr; }
+    .stat-row { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Top Navigation Bar -->
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-mark">PlateUp</div>
+      <div class="logo-tag">AI-Powered Surplus Marketplace</div>
+    </div>
+    <div class="top-controls" id="nav-controls">
+      <!-- Dynamic Controls Rendered via JS based on login session -->
+    </div>
+  </div>
+
+  <!-- ============ LOGIN SCREEN ============ -->
+  <div id="login" class="screen active">
+    <div class="auth-container">
+      <div class="auth-header">
+        <h2>Sign In to PlateUp</h2>
+        <p>Select your account type to access your portal</p>
+      </div>
+
+      <div class="role-picker">
+        <div class="role-opt selected" onclick="selectRole('customer', this)">Customer</div>
+        <div class="role-opt" onclick="selectRole('business', this)">Business</div>
+      </div>
+
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="auth-email" value="user@plateup.com" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="auth-pass" value="••••••••" required>
+        </div>
+        <button type="submit" class="btn-submit">Login & Continue</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ CUSTOMER SCREEN ============ -->
+  <div id="customer" class="screen">
+
+    <div class="hero">
+      <h1>Good food, before it's gone.</h1>
+      <p>Local restaurants list fresh surplus meals at fraction of original price. Order now and pick up before close.</p>
+      <div class="search-row">
+        <input type="text" id="loc-search" placeholder="City / District" value="Dhanmondi, Dhaka">
+        <input type="text" id="food-search" placeholder="Search bakery, biryani, groceries..." onkeyup="filterListings()">
+        <button onclick="filterListings()">Search</button>
+      </div>
+      <div class="rescue-stat">This week your area rescued <b>1,240 kg</b> of food. CO2 impact reduction: <b>3.1 tons</b>.</div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="chip-row">
+        <div class="chip on" onclick="filterCategory('All', this)">All</div>
+        <div class="chip" onclick="filterCategory('Bakery', this)">Bakery</div>
+        <div class="chip" onclick="filterCategory('Restaurant meal', this)">Restaurant meal</div>
+        <div class="chip" onclick="filterCategory('Groceries', this)">Groceries</div>
+        <div class="chip" onclick="filterCategory('Cafe', this)">Cafe</div>
+        <div class="chip" onclick="filterCategory('Produce', this)">Produce</div>
+      </div>
+      <div class="view-toggle">
+        <button class="active" onclick="toggleView('grid', this)">Grid View</button>
+        <button onclick="toggleView('map', this)">Map View</button>
+      </div>
+    </div>
+
+    <!-- Interactive Map Display -->
+    <div id="map-view" class="map-container">
+      <div class="map-bg">[ Interactive Map View - Food Rescue Pins ]</div>
+      <div class="map-pin" style="top:30%; left:40%;" onclick="alert('Aromas Bakery: 6 items left')">Aromas Bakery (৳180)</div>
+      <div class="map-pin" style="top:55%; left:60%;" onclick="alert('Spice Trail Kitchen: 3 items left')">Spice Trail Kitchen (৳140)</div>
+      <div class="map-pin" style="top:70%; left:30%;" onclick="alert('Green Basket: 2 crates left')">Green Basket (৳220)</div>
+    </div>
+
+    <!-- Listing Grid Container -->
+    <div class="grid" id="listing-grid">
+      <!-- Item Cards dynamically inserted/filtered -->
+    </div>
+
+  </div>
+
+  <!-- ============ BUSINESS SCREEN ============ -->
+  <div id="business" class="screen">
+    <div class="dash">
+
+      <div class="sidebar">
+        <div class="biz-id">
+          <div class="biz-avatar">ST</div>
+          <div>
+            <div class="biz-name">Spice Trail Kitchen</div>
+            <div class="biz-role">ID: BIZ-9042</div>
+          </div>
+        </div>
+        <div class="navitem on">Overview</div>
+        <div class="navitem">Manage Listings</div>
+        <div class="navitem">ML Analytics & Demand</div>
+        <div class="navitem">Customer Reviews</div>
+        <div class="navitem">Business Profile</div>
+        <button class="newlist-btn" onclick="openNewListingModal()">+ New Listing</button>
+      </div>
+
+      <div>
+        <div class="stat-row">
+          <div class="stat-card"><div class="stat-label">Active Listings</div><div class="stat-value">7</div></div>
+          <div class="stat-card"><div class="stat-label">Meals Rescued</div><div class="stat-value">34</div></div>
+          <div class="stat-card"><div class="stat-label">Today's Revenue</div><div class="stat-value">৳6,120</div></div>
+          <div class="stat-card"><div class="stat-label">Avg Rating</div><div class="stat-value">4.7 ★</div></div>
+        </div>
+
+        <!-- Dynamic ML Demand Prediction Display -->
+        <div class="ml-card">
+          <div>
+            <div class="label">AI ML Demand & Surplus Prediction Engine</div>
+            <p class="headline">Tomorrow's surplus demand is trending HIGH (+35%)</p>
+            <div class="sub">Dynamic Pricing Engine recommends pricing surplus rice trays at <b>৳130</b> for optimal 98% sell-through rate.</div>
+          </div>
+          <div class="ml-conf">92%<div style="font-family:var(--font-body);font-size:10px;font-weight:600;color:#AFCBB6;text-transform:uppercase;">Confidence Score</div></div>
+        </div>
+
+        <div class="panel">
+          <h3>Your Active Surplus Listings (FOOD_LISTINGS)</h3>
+          <table id="business-table">
+            <thead>
+              <tr><th>Item Title</th><th>Category</th><th>Qty Left</th><th>Rescue Price</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <!-- Dynamic Table Content -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h3>Weekly Rescue Sales Trend</h3>
+          <div class="chart">
+            <div class="bar-col"><div class="bar-val">৳3.2k</div><div class="bar" style="height:52%"></div><div class="bar-day">Mon</div></div>
+            <div class="bar-col"><div class="bar-val">৳4.1k</div><div class="bar" style="height:66%"></div><div class="bar-day">Tue</div></div>
+            <div class="bar-col"><div class="bar-val">৳3.8k</div><div class="bar" style="height:61%"></div><div class="bar-day">Wed</div></div>
+            <div class="bar-col"><div class="bar-val">৳5.0k</div><div class="bar" style="height:80%"></div><div class="bar-day">Thu</div></div>
+            <div class="bar-col"><div class="bar-val">৳4.4k</div><div class="bar" style="height:70%"></div><div class="bar-day">Fri</div></div>
+            <div class="bar-col"><div class="bar-val">৳5.9k</div><div class="bar" style="height:95%"></div><div class="bar-day">Sat</div></div>
+            <div class="bar-col"><div class="bar-val">৳6.1k</div><div class="bar" style="height:98%"></div><div class="bar-day">Sun</div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal: New Listing (Maps to FOOD_LISTINGS Schema) -->
+<div class="modal-overlay" id="new-listing-modal">
+  <div class="modal">
+    <h3>Create Surplus Listing</h3>
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="m-title" placeholder="e.g. Mixed Pastry surprise box">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Category</label>
+        <select id="m-category">
+          <option>Bakery</option>
+          <option>Restaurant meal</option>
+          <option>Groceries</option>
+          <option>Cafe</option>
+          <option>Produce</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Quantity</label>
+        <input type="number" id="m-qty" value="5">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Original Price (৳)</label>
+        <input type="number" id="m-orig-price" placeholder="450">
+      </div>
+      <div class="form-group">
+        <label>Rescue Price (৳)</label>
+        <input type="number" id="m-rescue-price" placeholder="180">
+      </div>
+    </div>
+    <div class="form-actions modal-actions">
+      <button class="btn-sec" onclick="closeModal('new-listing-modal')">Cancel</button>
+      <button class="btn-pri" onclick="submitNewListing()">Publish Listing</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Checkout Order -->
+<div class="modal-overlay" id="checkout-modal">
+  <div class="modal">
+    <h3>Complete Food Rescue Order</h3>
+    <p style="font-size: 13px; color: var(--ink-soft);">You are reserving items from active local restaurant listings.</p>
+    <div id="checkout-summary" style="margin: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0;">
+      <!-- Dynamic summary -->
+    </div>
+    <div class="form-group">
+      <label>Payment Method</label>
+      <select id="pay-method">
+        <option>bKash / Mobile Banking</option>
+        <option>Pay at Store Pickup</option>
+        <option>Credit/Debit Card</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-sec" onclick="closeModal('checkout-modal')">Cancel</button>
+      <button class="btn-pri" onclick="confirmOrder()">Confirm Reservation</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Mock Database mapped directly from ER diagram schema
+let listings = [
+  { id: 1, title: 'Mixed pastry surprise box', category: 'Bakery', biz: 'Aromas Bakery · Dhanmondi', orig: 450, rescue: 180, qty: 6, discount: '-60%', time: 'Ends in 1h 40m', aiRecommended: true },
+  { id: 2, title: 'Chicken biryani, end-of-day tray', category: 'Restaurant meal', biz: 'Spice Trail Kitchen · Mohammadpur', orig: 320, rescue: 140, qty: 3, discount: '-56%', time: 'Ends in 2h 10m', aiRecommended: false },
+  { id: 3, title: 'Ripe produce crate', category: 'Produce', biz: 'Green Basket Grocers · Dhanmondi', orig: 600, rescue: 220, qty: 2, discount: '-63%', time: 'Ends in 40m', aiRecommended: true },
+  { id: 4, title: 'Sandwich and salad bundle', category: 'Cafe', biz: 'Cafe Cornerstone · Uttara', orig: 390, rescue: 160, qty: 5, discount: '-59%', time: 'Ends in 3h', aiRecommended: false },
+  { id: 5, title: 'Assorted bread, day-old', category: 'Bakery', biz: 'Daily Dozen Bakes · Gulshan', orig: 280, rescue: 90, qty: 10, discount: '-68%', time: 'Ends in 4h', aiRecommended: false },
+  { id: 6, title: 'Pasta and grill leftovers box', category: 'Restaurant meal', biz: 'Rosun Deli · Banani', orig: 500, rescue: 200, qty: 4, discount: '-60%', time: 'Ends in 2h', aiRecommended: true }
+];
+
+let cartCount = 0;
+let activeCategory = 'All';
+let selectedRole = 'customer';
+let currentUser = null;
+
+function selectRole(role, el) {
+  selectedRole = role;
+  document.querySelectorAll('.role-opt').forEach(opt => opt.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function handleLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('auth-email').value;
+  
+  currentUser = {
+    email: email,
+    role: selectedRole
+  };
+
+  renderTopNav();
+
+  if (selectedRole === 'customer') {
+    showScreen('customer');
+  } else {
+    showScreen('business');
+  }
+}
+
+function handleLogout() {
+  currentUser = null;
+  renderTopNav();
+  showScreen('login');
+}
+
+function renderTopNav() {
+  const container = document.getElementById('nav-controls');
+  if (!currentUser) {
+    container.innerHTML = '';
+    return;
+  }
+
+  if (currentUser.role === 'customer') {
+    container.innerHTML = `
+      <span class="user-badge">CUSTOMER: ${currentUser.email}</span>
+      <button class="cart-chip" onclick="openCheckoutModal()">🛒 Cart (<span id="cart-count">${cartCount}</span>)</button>
+      <div class="switch">
+        <button class="active" onclick="switchView('customer', this)">Browse Food</button>
+        <button onclick="switchView('business', this)">Business Portal</button>
+      </div>
+      <button class="logout-btn" onclick="handleLogout()">Logout</button>
+    `;
+  } else {
+    container.innerHTML = `
+      <span class="user-badge">BUSINESS: ${currentUser.email}</span>
+      <div class="switch">
+        <button onclick="switchView('customer', this)">Browse Food</button>
+        <button class="active" onclick="switchView('business', this)">Business Portal</button>
+      </div>
+      <button class="logout-btn" onclick="handleLogout()">Logout</button>
+    `;
+  }
+}
+
+function renderListings() {
+  const grid = document.getElementById('listing-grid');
+  const tableBody = document.querySelector('#business-table tbody');
+  const query = document.getElementById('food-search').value.toLowerCase();
+  
+  grid.innerHTML = '';
+  tableBody.innerHTML = '';
+
+  listings.forEach(item => {
+    // Filter matching logic
+    const matchesCat = activeCategory === 'All' || item.category === activeCategory;
+    const matchesSearch = item.title.toLowerCase().includes(query) || item.biz.toLowerCase().includes(query);
+
+    if (matchesCat && matchesSearch) {
+      grid.innerHTML += `
+        <div class="food-card">
+          <div class="food-thumb">
+            <div class="urgency">${item.time}</div>
+            ${item.aiRecommended ? '<div class="ai-tag">AI Optimal</div>' : ''}
+            <span class="initial">${item.title.substring(0, 2)}</span>
+          </div>
+          <div class="food-body">
+            <div class="biz-line">${item.biz}</div>
+            <p class="food-title">${item.title}</p>
+            <div class="food-meta">${item.qty} items left · Pickup today</div>
+            <div class="ticket">
+              <div class="price-block">
+                <span class="orig-price">৳${item.orig}</span>
+                <span class="rescue-price">৳${item.rescue}</span>
+              </div>
+              <span class="save-pill">${item.discount}</span>
+            </div>
+            <button class="reserve-btn" onclick="addToCart(${item.id})">Reserve Meal</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Populate Business Table
+    let badgeClass = item.qty > 5 ? 'active' : item.qty > 0 ? 'low' : 'sold';
+    let statusText = item.qty > 5 ? 'Active' : item.qty > 0 ? 'Low Stock' : 'Sold Out';
+    
+    tableBody.innerHTML += `
+      <tr>
+        <td><b>${item.title}</b></td>
+        <td>${item.category}</td>
+        <td>${item.qty} units</td>
+        <td class="rowprice">৳${item.rescue}</td>
+        <td><span class="badge ${badgeClass}">${statusText}</span></td>
+      </tr>
+    `;
+  });
+}
+
+function addToCart(id) {
+  const item = listings.find(l => l.id === id);
+  if (item && item.qty > 0) {
+    item.qty--;
+    cartCount++;
+    const countEl = document.getElementById('cart-count');
+    if (countEl) countEl.innerText = cartCount;
+    renderListings();
+  } else {
+    alert('Sorry, this surplus item is sold out!');
+  }
+}
+
+function filterCategory(cat, el) {
+  activeCategory = cat;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  renderListings();
+}
+
+function filterListings() {
+  renderListings();
+}
+
+function toggleView(view, btn) {
+  document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  
+  if (view === 'map') {
+    document.getElementById('map-view').style.display = 'block';
+    document.getElementById('listing-grid').style.display = 'none';
+  } else {
+    document.getElementById('map-view').style.display = 'none';
+    document.getElementById('listing-grid').style.display = 'grid';
+  }
+}
+
+function showScreen(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+}
+
+function switchView(screenId, btn) {
+  showScreen(screenId);
+  document.querySelectorAll('.switch button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function openNewListingModal() {
+  document.getElementById('new-listing-modal').classList.add('active');
+}
+
+function openCheckoutModal() {
+  if (cartCount === 0) {
+    alert('Your rescue cart is empty!');
+    return;
+  }
+  document.getElementById('checkout-summary').innerHTML = `<b>Total Reserved Items:</b> ${cartCount} items`;
+  document.getElementById('checkout-modal').classList.add('active');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+function submitNewListing() {
+  const title = document.getElementById('m-title').value || 'Surplus Box';
+  const category = document.getElementById('m-category').value;
+  const qty = parseInt(document.getElementById('m-qty').value) || 1;
+  const orig = parseInt(document.getElementById('m-orig-price').value) || 300;
+  const rescue = parseInt(document.getElementById('m-rescue-price').value) || 120;
+  
+  const newItem = {
+    id: listings.length + 1,
+    title,
+    category,
+    biz: 'Spice Trail Kitchen · Local',
+    orig,
+    rescue,
+    qty,
+    discount: `-${Math.round((1 - rescue/orig)*100)}%`,
+    time: 'Ends in 3h',
+    aiRecommended: true
+  };
+
+  listings.unshift(newItem);
+  renderListings();
+  closeModal('new-listing-modal');
+}
+
+function confirmOrder() {
+  alert('Order placed successfully! Please check your order pickup time window.');
+  cartCount = 0;
+  const countEl = document.getElementById('cart-count');
+  if (countEl) countEl.innerText = 0;
+  closeModal('checkout-modal');
+}
+
+// Initial render
+renderListings();
+</script>
+</body>
+</html>
