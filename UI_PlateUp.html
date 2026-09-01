@@ -43,20 +43,33 @@
   .cart-chip { background: var(--amber-600); color: #432B04; font-weight: 700; border-radius: 999px; padding: 8px 16px; font-size: 13px; cursor: pointer; border: none; display: flex; align-items: center; gap: 6px; }
   
   .user-badge { background: var(--green-100); color: var(--green-900); padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; font-family: var(--font-mono); border: 1px solid var(--green-700); }
-  .logout-btn { background: var(--coral-100); color: var(--coral-700); border: 1px solid var(--coral-600); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 12px; cursor: pointer; }
+  .logout-btn { background: var(--coral-100); color: var(--coral-700); border: 1px solid var(--coral-600); padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 12px; cursor: pointer; transition: background 0.2s; }
+  .logout-btn:hover { background: var(--coral-600); color: #fff; }
 
   .screen { display: none; }
   .screen.active { display: block; }
 
-  /* Login / Authentication Screen */
-  .auth-container { max-width: 420px; margin: 40px auto; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); }
-  .auth-header { text-align: center; margin-bottom: 24px; }
-  .auth-header h2 { font-family: var(--font-display); font-size: 26px; margin: 0 0 6px; color: var(--green-900); }
+  /* Login & Signup Authentication Container */
+  .auth-container { max-width: 440px; margin: 40px auto; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); }
+  
+  .auth-tabs { display: flex; border-bottom: 2px solid var(--line); margin-bottom: 20px; }
+  .auth-tab { flex: 1; text-align: center; padding: 10px; font-weight: 700; font-size: 15px; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .auth-tab.active { color: var(--green-900); border-bottom-color: var(--green-900); }
+
+  .auth-header { text-align: center; margin-bottom: 20px; }
+  .auth-header h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 6px; color: var(--green-900); }
   .auth-header p { font-size: 13px; color: var(--ink-soft); margin: 0; }
   
   .role-picker { display: flex; gap: 8px; margin-bottom: 20px; }
   .role-opt { flex: 1; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); text-align: center; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
   .role-opt.selected { background: var(--green-900); color: #fff; border-color: var(--green-900); }
+
+  /* Alert Banners */
+  .auth-error { display: none; background: var(--coral-100); border: 1px solid var(--coral-600); color: var(--coral-700); padding: 10px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; margin-bottom: 16px; text-align: center; }
+  .auth-success { display: none; background: var(--green-100); border: 1px solid var(--green-700); color: var(--green-900); padding: 10px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; margin-bottom: 16px; text-align: center; }
+
+  .auth-form { display: none; }
+  .auth-form.active { display: block; }
 
   .btn-submit { width: 100%; background: var(--green-900); color: #fff; border: none; padding: 12px; border-radius: 9px; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
   .btn-submit:hover { background: var(--green-700); }
@@ -99,7 +112,7 @@
   .orig-price { font-family: var(--font-mono); font-size: 12px; color: #9AA394; text-decoration: line-through; }
   .rescue-price { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--green-900); }
   .save-pill { background: var(--amber-100); color: var(--amber-700); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-family: var(--font-mono); }
-  .reserve-btn { width: 100%; margin-top: 12px; background: var(--green-900); color: #fff; border: none; padding: 10px; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; transition: background 0.2s; }
+  .reserve-btn { width: 100%; margin-top: 12px; background: var(--green-900); color: #fff; border: none; padding: 10px; border-radius: 999px; font-weight: 700; font-size: 13px; cursor: pointer; transition: background 0.2s; }
   .reserve-btn:hover { background: var(--green-700); }
 
   /* Map Container View */
@@ -114,9 +127,9 @@
   .biz-avatar { width: 38px; height: 38px; border-radius: 10px; background: var(--green-900); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--font-display); }
   .biz-name { font-size: 13.5px; font-weight: 700; }
   .biz-role { font-size: 11px; color: var(--ink-soft); }
-  .navitem { display: block; padding: 9px 10px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 2px; cursor: pointer; }
+  .navitem { display: block; padding: 9px 10px; border-radius: 999px; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 2px; cursor: pointer; }
   .navitem.on { background: var(--green-100); color: var(--green-900); }
-  .newlist-btn { width: 100%; margin-top: 14px; background: var(--amber-600); color: #432B04; border: none; padding: 10px; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .newlist-btn { width: 100%; margin-top: 14px; background: var(--amber-600); color: #432B04; border: none; padding: 10px; border-radius: 999px; font-weight: 700; font-size: 13px; cursor: pointer; }
 
   .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
   .stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; }
@@ -179,34 +192,71 @@
       <div class="logo-tag">AI-Powered Surplus Marketplace</div>
     </div>
     <div class="top-controls" id="nav-controls">
-      <!-- Dynamic Controls Rendered via JS based on login session -->
+      <!-- Dynamic Navigation Rendered via JavaScript -->
     </div>
   </div>
 
-  <!-- ============ LOGIN SCREEN ============ -->
+  <!-- ============ LOGIN / SIGNUP SCREEN ============ -->
   <div id="login" class="screen active">
     <div class="auth-container">
-      <div class="auth-header">
-        <h2>Sign In to PlateUp</h2>
-        <p>Select your account type to access your portal</p>
+      
+      <!-- Tab Controls -->
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="switchAuthMode('login', this)">Sign In</div>
+        <div class="auth-tab" onclick="switchAuthMode('signup', this)">Create Account</div>
       </div>
 
+      <div class="auth-header">
+        <h2 id="auth-title">Welcome Back</h2>
+        <p id="auth-desc">Select your account role to continue</p>
+      </div>
+
+      <!-- Alert Banners -->
+      <div id="auth-error-banner" class="auth-error">Invalid email or password.</div>
+      <div id="auth-success-banner" class="auth-success">Account created! You can now sign in.</div>
+
+      <!-- Common Role Selector -->
       <div class="role-picker">
         <div class="role-opt selected" onclick="selectRole('customer', this)">Customer</div>
         <div class="role-opt" onclick="selectRole('business', this)">Business</div>
       </div>
 
-      <form onsubmit="handleLogin(event)">
+      <!-- SIGN IN FORM -->
+      <form id="form-login" class="auth-form active" onsubmit="handleLogin(event)">
         <div class="form-group">
           <label>Email Address</label>
-          <input type="email" id="auth-email" value="user@plateup.com" required>
+          <input type="email" id="login-email" value="user@plateup.com" required>
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input type="password" id="auth-pass" value="••••••••" required>
+          <input type="password" id="login-pass" value="password123" required>
         </div>
-        <button type="submit" class="btn-submit">Login & Continue</button>
+        <button type="submit" class="btn-submit">Sign In</button>
       </form>
+
+      <!-- SIGN UP FORM -->
+      <form id="form-signup" class="auth-form" onsubmit="handleSignup(event)">
+        <div class="form-group">
+          <label id="name-label">Full Name</label>
+          <input type="text" id="signup-name" placeholder="John Doe" required>
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="signup-email" placeholder="name@example.com" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="signup-pass" placeholder="••••••••" required>
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <input type="password" id="signup-pass-confirm" placeholder="••••••••" required>
+          </div>
+        </div>
+        <button type="submit" class="btn-submit">Create Account</button>
+      </form>
+
     </div>
   </div>
 
@@ -249,7 +299,7 @@
 
     <!-- Listing Grid Container -->
     <div class="grid" id="listing-grid">
-      <!-- Item Cards dynamically inserted/filtered -->
+      <!-- Dynamic Item Cards -->
     </div>
 
   </div>
@@ -260,10 +310,10 @@
 
       <div class="sidebar">
         <div class="biz-id">
-          <div class="biz-avatar">ST</div>
+          <div class="biz-avatar" id="biz-avatar-text">ST</div>
           <div>
-            <div class="biz-name">Spice Trail Kitchen</div>
-            <div class="biz-role">ID: BIZ-9042</div>
+            <div class="biz-name" id="biz-name-text">Spice Trail Kitchen</div>
+            <div class="biz-role" id="biz-role-text">ID: BIZ-9042</div>
           </div>
         </div>
         <div class="navitem on">Overview</div>
@@ -323,7 +373,7 @@
 
 </div>
 
-<!-- Modal: New Listing (Maps to FOOD_LISTINGS Schema) -->
+<!-- Modal: New Listing -->
 <div class="modal-overlay" id="new-listing-modal">
   <div class="modal">
     <h3>Create Surplus Listing</h3>
@@ -369,9 +419,7 @@
   <div class="modal">
     <h3>Complete Food Rescue Order</h3>
     <p style="font-size: 13px; color: var(--ink-soft);">You are reserving items from active local restaurant listings.</p>
-    <div id="checkout-summary" style="margin: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0;">
-      <!-- Dynamic summary -->
-    </div>
+    <div id="checkout-summary" style="margin: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0;"></div>
     <div class="form-group">
       <label>Payment Method</label>
       <select id="pay-method">
@@ -388,7 +436,13 @@
 </div>
 
 <script>
-// Mock Database mapped directly from ER diagram schema
+// Initial Local User Database
+let usersDatabase = [
+  { name: 'Demo Customer', email: 'user@plateup.com', pass: 'password123', role: 'customer' },
+  { name: 'Spice Trail Kitchen', email: 'spicetrail@plateup.com', pass: 'password123', role: 'business' }
+];
+
+// Mock Database of Listings
 let listings = [
   { id: 1, title: 'Mixed pastry surprise box', category: 'Bakery', biz: 'Aromas Bakery · Dhanmondi', orig: 450, rescue: 180, qty: 6, discount: '-60%', time: 'Ends in 1h 40m', aiRecommended: true },
   { id: 2, title: 'Chicken biryani, end-of-day tray', category: 'Restaurant meal', biz: 'Spice Trail Kitchen · Mohammadpur', orig: 320, rescue: 140, qty: 3, discount: '-56%', time: 'Ends in 2h 10m', aiRecommended: false },
@@ -401,35 +455,144 @@ let listings = [
 let cartCount = 0;
 let activeCategory = 'All';
 let selectedRole = 'customer';
+let authMode = 'login';
 let currentUser = null;
 
+// Auth Tab Switcher
+function switchAuthMode(mode, tabEl) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+
+  clearAuthBanners();
+
+  const loginForm = document.getElementById('form-login');
+  const signupForm = document.getElementById('form-signup');
+  const title = document.getElementById('auth-title');
+  const desc = document.getElementById('auth-desc');
+
+  if (mode === 'login') {
+    loginForm.classList.add('active');
+    signupForm.classList.remove('active');
+    title.innerText = "Welcome Back";
+    desc.innerText = "Select your account role to continue";
+  } else {
+    loginForm.classList.remove('active');
+    signupForm.classList.add('active');
+    title.innerText = "Create Account";
+    desc.innerText = "Join PlateUp to rescue fresh surplus food";
+  }
+}
+
+// Role Selector
 function selectRole(role, el) {
   selectedRole = role;
   document.querySelectorAll('.role-opt').forEach(opt => opt.classList.remove('selected'));
   el.classList.add('selected');
+  clearAuthBanners();
+
+  // Dynamic placeholders & defaults based on role
+  const loginEmail = document.getElementById('login-email');
+  const nameLabel = document.getElementById('name-label');
+
+  if (role === 'customer') {
+    loginEmail.value = 'user@plateup.com';
+    nameLabel.innerText = "Full Name";
+  } else {
+    loginEmail.value = 'spicetrail@plateup.com';
+    nameLabel.innerText = "Business / Restaurant Name";
+  }
 }
 
+function showAuthError(msg) {
+  const banner = document.getElementById('auth-error-banner');
+  banner.innerText = msg;
+  banner.style.display = 'block';
+  document.getElementById('auth-success-banner').style.display = 'none';
+}
+
+function showAuthSuccess(msg) {
+  const banner = document.getElementById('auth-success-banner');
+  banner.innerText = msg;
+  banner.style.display = 'block';
+  document.getElementById('auth-error-banner').style.display = 'none';
+}
+
+function clearAuthBanners() {
+  document.getElementById('auth-error-banner').style.display = 'none';
+  document.getElementById('auth-success-banner').style.display = 'none';
+}
+
+// Handle Sign In Logic
 function handleLogin(e) {
   e.preventDefault();
-  const email = document.getElementById('auth-email').value;
-  
-  currentUser = {
-    email: email,
-    role: selectedRole
-  };
+  clearAuthBanners();
 
-  renderTopNav();
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
 
-  if (selectedRole === 'customer') {
-    showScreen('customer');
+  const match = usersDatabase.find(u => u.email === email && u.pass === pass && u.role === selectedRole);
+
+  if (match) {
+    currentUser = match;
+    renderTopNav();
+
+    if (currentUser.role === 'business') {
+      document.getElementById('biz-name-text').innerText = currentUser.name;
+      document.getElementById('biz-avatar-text').innerText = currentUser.name.substring(0, 2).toUpperCase();
+      showScreen('business');
+    } else {
+      showScreen('customer');
+    }
   } else {
-    showScreen('business');
+    showAuthError(`Invalid ${selectedRole} email or password.`);
   }
+}
+
+// Handle Sign Up Logic
+function handleSignup(e) {
+  e.preventDefault();
+  clearAuthBanners();
+
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass = document.getElementById('signup-pass').value;
+  const passConfirm = document.getElementById('signup-pass-confirm').value;
+
+  if (pass !== passConfirm) {
+    showAuthError("Passwords do not match. Please re-enter.");
+    return;
+  }
+
+  // Check if email already registered
+  const exists = usersDatabase.some(u => u.email === email);
+  if (exists) {
+    showAuthError("An account with this email address already exists.");
+    return;
+  }
+
+  // Save new user
+  const newUser = { name, email, pass, role: selectedRole };
+  usersDatabase.push(newUser);
+
+  // Clear signup form
+  document.getElementById('signup-name').value = '';
+  document.getElementById('signup-email').value = '';
+  document.getElementById('signup-pass').value = '';
+  document.getElementById('signup-pass-confirm').value = '';
+
+  // Switch to login tab and prefill login email
+  switchAuthMode('login', document.querySelectorAll('.auth-tab')[0]);
+  document.getElementById('login-email').value = email;
+  document.getElementById('login-pass').value = pass;
+
+  showAuthSuccess("Account created successfully! Click Sign In to continue.");
 }
 
 function handleLogout() {
   currentUser = null;
   renderTopNav();
+  clearAuthBanners();
   showScreen('login');
 }
 
@@ -471,7 +634,6 @@ function renderListings() {
   tableBody.innerHTML = '';
 
   listings.forEach(item => {
-    // Filter matching logic
     const matchesCat = activeCategory === 'All' || item.category === activeCategory;
     const matchesSearch = item.title.toLowerCase().includes(query) || item.biz.toLowerCase().includes(query);
 
@@ -500,7 +662,6 @@ function renderListings() {
       `;
     }
 
-    // Populate Business Table
     let badgeClass = item.qty > 5 ? 'active' : item.qty > 0 ? 'low' : 'sold';
     let statusText = item.qty > 5 ? 'Active' : item.qty > 0 ? 'Low Stock' : 'Sold Out';
     
@@ -592,7 +753,7 @@ function submitNewListing() {
     id: listings.length + 1,
     title,
     category,
-    biz: 'Spice Trail Kitchen · Local',
+    biz: currentUser ? `${currentUser.name} · Local` : 'Spice Trail Kitchen · Local',
     orig,
     rescue,
     qty,
