@@ -190,6 +190,54 @@
 
   </div>
 
+  <!-- ============ PROFILE SCREEN ============ -->
+  <div id="profile" class="screen">
+    <div class="profile-header">
+      <div>
+        <p class="eyebrow">Your PlateUp account</p>
+        <h1>Profile & Order History</h1>
+        <p>Keep track of your account details and rescued meals in one place.</p>
+      </div>
+      <button class="btn-pri" onclick="showScreen('customer')">Browse Food</button>
+    </div>
+
+    <div class="profile-grid">
+      <section class="profile-card profile-details-card">
+        <div class="profile-avatar" id="profile-avatar">PU</div>
+        <div>
+          <p class="profile-label">Account holder</p>
+          <h2 id="profile-name">PlateUp User</h2>
+          <p id="profile-email" class="profile-muted">user@plateup.com</p>
+        </div>
+        <div class="profile-detail-list">
+          <div><span>Account type</span><strong id="profile-role">Customer</strong></div>
+          <div><span>Member since</span><strong id="profile-member-since">Today</strong></div>
+          <div><span>Account status</span><strong class="profile-status">Active</strong></div>
+        </div>
+      </section>
+
+      <section class="profile-card profile-summary-card">
+        <p class="profile-label">Your rescue impact</p>
+        <div class="profile-summary-number" id="profile-order-count">0</div>
+        <p>completed orders</p>
+        <div class="profile-summary-foot"><span>Meals rescued</span><strong id="profile-meal-count">0</strong></div>
+      </section>
+    </div>
+
+    <section class="profile-card order-history-card">
+      <div class="profile-section-heading">
+        <div>
+          <p class="profile-label">Activity</p>
+          <h2>Order history</h2>
+        </div>
+        <span class="profile-history-note">Saved to your account</span>
+      </div>
+      <div id="order-history" class="order-history">
+        <div class="empty-history">Your completed reservations will appear here.</div>
+      </div>
+    </section>
+  </div>
+
   <!-- ============ BUSINESS SCREEN ============ -->
   <div id="business" class="screen">
     <div class="dash">

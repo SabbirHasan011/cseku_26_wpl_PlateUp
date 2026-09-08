@@ -5,6 +5,9 @@ let activeCategory = 'All';
 let selectedRole = 'customer';
 let authMode = 'login';
 let currentUser = null;
+let activeScreen = 'home';
+let cartItems = [];
+let orderHistory = [];
 
 function persistSession() {
   if (currentUser) {
@@ -19,6 +22,7 @@ function restoreSession() {
 
   try {
     currentUser = JSON.parse(savedUser);
+    loadOrderHistory();
     if (currentUser.role === 'business') {
       document.getElementById('biz-name-text').innerText = currentUser.name;
       document.getElementById('biz-avatar-text').innerText = currentUser.name.substring(0, 2).toUpperCase();
@@ -27,6 +31,65 @@ function restoreSession() {
     localStorage.removeItem('plateup_user');
     localStorage.removeItem('plateup_token');
   }
+}
+
+function orderHistoryKey() {
+  return currentUser ? `plateup_orders_${currentUser.email.toLowerCase()}` : null;
+}
+
+function loadOrderHistory() {
+  const key = orderHistoryKey();
+  if (!key) {
+    orderHistory = [];
+    return;
+  }
+
+  try {
+    const savedOrders = JSON.parse(localStorage.getItem(key) || '[]');
+    orderHistory = Array.isArray(savedOrders) ? savedOrders : [];
+  } catch (error) {
+    orderHistory = [];
+  }
+}
+
+function saveOrderHistory() {
+  const key = orderHistoryKey();
+  if (key) localStorage.setItem(key, JSON.stringify(orderHistory));
+}
+
+function renderProfile() {
+  if (!currentUser) {
+    showScreen('login');
+    return;
+  }
+
+  const name = currentUser.name || 'PlateUp User';
+  const email = currentUser.email || '';
+  const mealCount = orderHistory.reduce((total, order) => total + order.items.length, 0);
+
+  document.getElementById('profile-avatar').innerText = name.substring(0, 2).toUpperCase();
+  document.getElementById('profile-name').innerText = name;
+  document.getElementById('profile-email').innerText = email;
+  document.getElementById('profile-role').innerText = currentUser.role === 'business' ? 'Business' : 'Customer';
+  document.getElementById('profile-order-count').innerText = orderHistory.length;
+  document.getElementById('profile-meal-count').innerText = mealCount;
+
+  const history = document.getElementById('order-history');
+  if (orderHistory.length === 0) {
+    history.innerHTML = '<div class="empty-history">Your completed reservations will appear here.</div>';
+    return;
+  }
+
+  history.innerHTML = orderHistory.map(order => `
+    <div class="order-row">
+      <div class="order-main">
+        <strong>Order #${order.id}</strong>
+        <span>${order.date}</span>
+      </div>
+      <div class="order-items">${order.items.map(item => `<span>${item.title} · ${item.biz}</span>`).join('')}</div>
+      <div class="order-total"><strong>৳${order.total}</strong><span class="badge active">Completed</span></div>
+    </div>
+  `).join('');
 }
 
 async function requestJson(url, options = {}) {
@@ -163,6 +226,7 @@ async function handleLogin(e) {
     currentUser = data.user;
     localStorage.setItem('plateup_token', data.token || '');
     persistSession();
+    loadOrderHistory();
     renderTopNav();
 
     if (currentUser.role === 'business') {
@@ -179,6 +243,7 @@ async function handleLogin(e) {
       currentUser = match;
       localStorage.setItem('plateup_token', 'demo-session');
       persistSession();
+      loadOrderHistory();
       renderTopNav();
       if (currentUser.role === 'business') {
         document.getElementById('biz-name-text').innerText = currentUser.name;
@@ -259,8 +324,8 @@ function renderTopNav() {
   if (!currentUser) {
     container.innerHTML = `
       <div class="switch">
-        <button class="active" onclick="showScreen('home')">Home</button>
-        <button onclick="showScreen('customer')">Marketplace</button>
+        <button class="${activeScreen === 'home' ? 'active' : ''}" onclick="showScreen('home')">Home</button>
+        <button class="${activeScreen === 'customer' ? 'active' : ''}" onclick="showScreen('customer')">Marketplace</button>
       </div>
       <button class="btn-pri" style="border-radius:999px; padding: 8px 18px; font-size:13px;" onclick="showScreen('login')">Sign In</button>
     `;
@@ -272,20 +337,21 @@ function renderTopNav() {
       <span class="user-badge">CUSTOMER: ${currentUser.email}</span>
       <button class="cart-chip" onclick="openCheckoutModal()">🛒 Cart (<span id="cart-count">${cartCount}</span>)</button>
       <div class="switch">
-        <button onclick="showScreen('home')">Home</button>
-        <button class="active" onclick="showScreen('customer')">Browse Food</button>
-        <button onclick="showScreen('business')">Business Portal</button>
+        <button class="${activeScreen === 'home' ? 'active' : ''}" onclick="showScreen('home')">Home</button>
+        <button class="${activeScreen === 'customer' ? 'active' : ''}" onclick="showScreen('customer')">Browse Food</button>
       </div>
+      <button class="profile-nav-btn" onclick="showScreen('profile')">Profile</button>
       <button class="logout-btn" onclick="handleLogout()">Logout</button>
     `;
   } else {
     container.innerHTML = `
       <span class="user-badge">BUSINESS: ${currentUser.email}</span>
       <div class="switch">
-        <button onclick="showScreen('home')">Home</button>
-        <button onclick="showScreen('customer')">Browse Food</button>
-        <button class="active" onclick="showScreen('business')">Business Portal</button>
+        <button class="${activeScreen === 'home' ? 'active' : ''}" onclick="showScreen('home')">Home</button>
+        <button class="${activeScreen === 'customer' ? 'active' : ''}" onclick="showScreen('customer')">Browse Food</button>
+        <button class="${activeScreen === 'business' ? 'active' : ''}" onclick="showScreen('business')">Business Portal</button>
       </div>
+      <button class="profile-nav-btn" onclick="showScreen('profile')">Profile</button>
       <button class="logout-btn" onclick="handleLogout()">Logout</button>
     `;
   }
@@ -485,6 +551,7 @@ function addToCart(id) {
   const item = listings.find(l => l.id === id);
   if (item && item.qty > 0) {
     item.qty--;
+    cartItems.push({ title: item.title, biz: item.biz, price: item.rescue });
     cartCount++;
     const countEl = document.getElementById('cart-count');
     if (countEl) countEl.innerText = cartCount;
@@ -519,6 +586,15 @@ function toggleView(view, btn) {
 }
 
 function showScreen(screenId) {
+  if (screenId === 'profile' && !currentUser) {
+    screenId = 'login';
+  }
+
+  if (screenId === 'business' && (!currentUser || currentUser.role !== 'business')) {
+    screenId = 'customer';
+  }
+
+  activeScreen = screenId;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(screenId).classList.add('active');
   localStorage.setItem('plateup_screen', screenId);
@@ -526,6 +602,9 @@ function showScreen(screenId) {
   renderTopNav();
   if (screenId === 'business') {
     renderReviews();
+  }
+  if (screenId === 'profile') {
+    renderProfile();
   }
 }
 
@@ -587,8 +666,18 @@ async function submitNewListing() {
 }
 
 function confirmOrder() {
+  if (cartItems.length === 0) return;
+
+  orderHistory.unshift({
+    id: `PU-${Date.now().toString().slice(-6)}`,
+    date: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
+    items: cartItems,
+    total: cartItems.reduce((total, item) => total + item.price, 0)
+  });
+  saveOrderHistory();
   alert('Order placed successfully! Please check your order pickup time window.');
   cartCount = 0;
+  cartItems = [];
   const countEl = document.getElementById('cart-count');
   if (countEl) countEl.innerText = 0;
   closeModal('checkout-modal');
