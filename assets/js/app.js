@@ -8,6 +8,8 @@ let currentUser = null;
 let activeScreen = 'home';
 let cartItems = [];
 let orderHistory = [];
+let selectedReviewOrder = null;
+let reviewCarouselTimer = null;
 
 function persistSession() {
   if (currentUser) {
@@ -87,7 +89,7 @@ function renderProfile() {
         <span>${order.date}</span>
       </div>
       <div class="order-items">${order.items.map(item => `<span>${item.title} · ${item.biz}</span>`).join('')}</div>
-      <div class="order-total"><strong>৳${order.total}</strong><span class="badge active">Completed</span></div>
+      <div class="order-total"><strong>৳${order.total}</strong><span class="badge active">Completed</span><button class="review-order-btn" onclick="openReviewModal('${order.id}')">Leave Review</button></div>
     </div>
   `).join('');
 }
@@ -146,6 +148,42 @@ async function loadInitialData() {
 
   renderListings();
   renderReviews();
+  renderHomeReviews();
+}
+
+function renderHomeReviews() {
+  const carousel = document.getElementById('home-reviews-carousel');
+  const dots = document.getElementById('review-carousel-dots');
+  if (!carousel || !dots) return;
+
+  const publicReviews = reviewsDatabase.slice(0, 6);
+  if (publicReviews.length === 0) {
+    carousel.innerHTML = '<div class="empty-history">Customer reviews will appear here.</div>';
+    dots.innerHTML = '';
+    return;
+  }
+
+  carousel.innerHTML = publicReviews.map((review, index) => `
+    <article class="home-review-slide ${index === 0 ? 'active' : ''}">
+      <div class="home-review-stars">${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)}</div>
+      <blockquote>“${review.comment}”</blockquote>
+      <div class="home-review-author"><strong>${review.author}</strong><span>${review.biz} · ${review.item}</span></div>
+    </article>
+  `).join('');
+  dots.innerHTML = publicReviews.map((_, index) => `<button class="${index === 0 ? 'active' : ''}" aria-label="Show review ${index + 1}" onclick="showReviewSlide(${index})"></button>`).join('');
+
+  if (reviewCarouselTimer) clearInterval(reviewCarouselTimer);
+  if (publicReviews.length > 1) {
+    reviewCarouselTimer = setInterval(() => {
+      const activeIndex = [...document.querySelectorAll('.home-review-slide')].findIndex(slide => slide.classList.contains('active'));
+      showReviewSlide((activeIndex + 1) % publicReviews.length);
+    }, 5000);
+  }
+}
+
+function showReviewSlide(index) {
+  document.querySelectorAll('.home-review-slide').forEach((slide, slideIndex) => slide.classList.toggle('active', slideIndex === index));
+  document.querySelectorAll('.review-carousel-dots button').forEach((dot, dotIndex) => dot.classList.toggle('active', dotIndex === index));
 }
 
 function switchAuthMode(mode, tabEl) {
@@ -483,7 +521,22 @@ function submitReviewReply(reviewId) {
   }
 }
 
-function openReviewModal() {
+function openReviewModal(orderId) {
+  selectedReviewOrder = orderHistory.find(order => order.id === orderId) || null;
+  const context = document.getElementById('review-order-context');
+  if (selectedReviewOrder) {
+    const firstItem = selectedReviewOrder.items[0];
+    const businessName = firstItem.biz.replace(/ · Local$/, '');
+    const businessSelect = document.getElementById('rev-biz');
+    if (![...businessSelect.options].some(option => option.value === businessName)) {
+      businessSelect.add(new Option(businessName, businessName));
+    }
+    businessSelect.value = businessName;
+    document.getElementById('rev-item').value = firstItem.title;
+    context.innerText = `Reviewing order #${selectedReviewOrder.id}`;
+  } else {
+    context.innerText = '';
+  }
   document.getElementById('review-modal').classList.add('active');
 }
 
@@ -498,6 +551,17 @@ async function submitCustomerReview() {
     return;
   }
 
+  const newReview = {
+    id: `local-${Date.now()}`,
+    biz,
+    author: currentUser ? currentUser.name : 'Verified Customer',
+    rating,
+    time: 'Just now',
+    item,
+    comment,
+    reply: null
+  };
+
   try {
     await requestJson(`${API_BASE}/reviews`, {
       method: 'POST',
@@ -510,19 +574,10 @@ async function submitCustomerReview() {
       })
     });
   } catch (error) {
-    const newReview = {
-      id: reviewsDatabase.length + 1,
-      biz,
-      author: currentUser ? currentUser.name : 'Verified Customer',
-      rating,
-      time: 'Just now',
-      item,
-      comment,
-      reply: null
-    };
-
-    reviewsDatabase.unshift(newReview);
+    console.warn('Review backend unavailable, showing review locally:', error.message);
   }
+
+  reviewsDatabase.unshift(newReview);
 
   alert('Thank you! Your feedback has been submitted to the restaurant.');
 
@@ -531,6 +586,8 @@ async function submitCustomerReview() {
   closeModal('review-modal');
 
   renderReviews();
+  renderHomeReviews();
+  selectedReviewOrder = null;
 }
 
 function switchBizTab(tabName, el) {

@@ -79,6 +79,20 @@
       </div>
     </div>
 
+    <!-- Customer Reviews Section -->
+    <section class="home-reviews panel">
+      <div class="home-reviews-heading">
+        <div>
+          <p class="profile-label">From the PlateUp community</p>
+          <h2 class="home-section-title">What customers are saying</h2>
+        </div>
+        <div class="review-carousel-dots" id="review-carousel-dots"></div>
+      </div>
+      <div class="review-carousel" id="home-reviews-carousel">
+        <div class="empty-history">Customer reviews will appear here.</div>
+      </div>
+    </section>
+
   </div>
 
   <!-- ============ LOGIN / SIGNUP SCREEN ============ -->
@@ -171,7 +185,6 @@
       <div class="view-toggle">
         <button class="active" onclick="toggleView('grid', this)">Grid View</button>
         <button onclick="toggleView('map', this)">Map View</button>
-        <button onclick="openReviewModal()" style="margin-left: 8px; background: var(--green-100); color: var(--green-900); font-weight: 700;">+ Leave Review</button>
       </div>
     </div>
 
@@ -371,6 +384,7 @@
 <div class="modal-overlay" id="review-modal">
   <div class="modal">
     <h3>Leave a Review</h3>
+    <p id="review-order-context" class="review-order-context"></p>
     <div class="form-group">
       <label>Select Restaurant / Store</label>
       <select id="rev-biz">

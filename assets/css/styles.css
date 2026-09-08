@@ -77,6 +77,25 @@
   .order-total { align-items: flex-end; }
   .order-total strong { font-family: var(--font-mono); color: var(--green-900); }
   .empty-history { color: var(--ink-soft); font-size: 13px; padding: 24px 0 4px; text-align: center; }
+  .review-order-btn { background: var(--green-100); color: var(--green-900); border: 1px solid var(--green-700); border-radius: 999px; padding: 5px 9px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .review-order-context { color: var(--green-700); font-size: 12px; font-weight: 700; margin: -8px 0 16px; }
+
+  /* Homepage Review Carousel */
+  .home-reviews { margin-top: 20px; }
+  .home-reviews-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+  .home-reviews-heading .home-section-title { text-align: left; margin-bottom: 0; }
+  .review-carousel { min-height: 170px; position: relative; overflow: hidden; border-top: 1px solid var(--line); margin-top: 15px; }
+  .home-review-slide { display: none; min-height: 170px; padding: 24px 12px 8px; animation: review-slide-in 0.45s ease both; }
+  .home-review-slide.active { display: block; }
+  .home-review-stars { color: var(--amber-600); font-size: 18px; letter-spacing: 2px; }
+  .home-review-slide blockquote { color: var(--ink); font-family: var(--font-display); font-size: 22px; line-height: 1.35; margin: 12px 0 18px; max-width: 780px; }
+  .home-review-author { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+  .home-review-author strong { color: var(--green-900); }
+  .home-review-author span { color: var(--ink-soft); font-size: 12px; }
+  .review-carousel-dots { display: flex; gap: 6px; }
+  .review-carousel-dots button { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 50%; background: var(--line); cursor: pointer; }
+  .review-carousel-dots button.active { background: var(--green-900); transform: scale(1.25); }
+  @keyframes review-slide-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
 
   /* ================= HOMEPAGE STYLING ================= */
   .home-hero { background: var(--green-900); color: #fff; border-radius: 24px; padding: 60px 40px; text-align: center; margin-bottom: 40px; position: relative; overflow: hidden; }
@@ -256,4 +275,6 @@
     .profile-detail-list { grid-template-columns: 1fr; }
     .profile-header h1 { font-size: 28px; }
     .order-total { align-items: flex-start; }
+    .home-reviews-heading { align-items: flex-start; flex-direction: column; }
+    .home-review-slide blockquote { font-size: 19px; }
   }
