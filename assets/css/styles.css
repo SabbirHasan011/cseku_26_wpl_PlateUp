@@ -78,6 +78,9 @@
   .order-total strong { font-family: var(--font-mono); color: var(--green-900); }
   .empty-history { color: var(--ink-soft); font-size: 13px; padding: 24px 0 4px; text-align: center; }
   .review-order-btn { background: var(--green-100); color: var(--green-900); border: 1px solid var(--green-700); border-radius: 999px; padding: 5px 9px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .review-order-btn.danger-action { background: var(--coral-100); color: var(--coral-700); border-color: var(--coral-600); }
+  .table-actions, .review-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .review-actions { margin-top: 10px; }
   .review-order-context { color: var(--green-700); font-size: 12px; font-weight: 700; margin: -8px 0 16px; }
 
   /* Homepage Review Carousel */
