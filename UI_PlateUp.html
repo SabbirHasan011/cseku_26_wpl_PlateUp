@@ -79,6 +79,20 @@
       </div>
     </div>
 
+    <!-- Customer Reviews Section -->
+    <section class="home-reviews panel">
+      <div class="home-reviews-heading">
+        <div>
+          <p class="profile-label">From the PlateUp community</p>
+          <h2 class="home-section-title">What customers are saying</h2>
+        </div>
+        <div class="review-carousel-dots" id="review-carousel-dots"></div>
+      </div>
+      <div class="review-carousel" id="home-reviews-carousel">
+        <div class="empty-history">Customer reviews will appear here.</div>
+      </div>
+    </section>
+
   </div>
 
   <!-- ============ LOGIN / SIGNUP SCREEN ============ -->
@@ -171,7 +185,6 @@
       <div class="view-toggle">
         <button class="active" onclick="toggleView('grid', this)">Grid View</button>
         <button onclick="toggleView('map', this)">Map View</button>
-        <button onclick="openReviewModal()" style="margin-left: 8px; background: var(--green-100); color: var(--green-900); font-weight: 700;">+ Leave Review</button>
       </div>
     </div>
 
@@ -282,7 +295,7 @@
             <h3>Your Active Surplus Listings (FOOD_LISTINGS)</h3>
             <table id="business-table">
               <thead>
-                <tr><th>Item Title</th><th>Category</th><th>Qty Left</th><th>Rescue Price</th><th>Status</th></tr>
+                <tr><th>Item Title</th><th>Category</th><th>Qty Left</th><th>Rescue Price</th><th>Status</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 <!-- Dynamic Table Content -->
@@ -329,7 +342,7 @@
 <!-- Modal: New Listing -->
 <div class="modal-overlay" id="new-listing-modal">
   <div class="modal">
-    <h3>Create Surplus Listing</h3>
+    <h3 id="listing-modal-title">Create Surplus Listing</h3>
     <div class="form-group">
       <label>Title</label>
       <input type="text" id="m-title" placeholder="e.g. Mixed Pastry surprise box">
@@ -362,7 +375,7 @@
     </div>
     <div class="form-actions modal-actions">
       <button class="btn-sec" onclick="closeModal('new-listing-modal')">Cancel</button>
-      <button class="btn-pri" onclick="submitNewListing()">Publish Listing</button>
+      <button class="btn-pri" id="listing-submit-btn" onclick="submitNewListing()">Publish Listing</button>
     </div>
   </div>
 </div>
@@ -371,6 +384,7 @@
 <div class="modal-overlay" id="review-modal">
   <div class="modal">
     <h3>Leave a Review</h3>
+    <p id="review-order-context" class="review-order-context"></p>
     <div class="form-group">
       <label>Select Restaurant / Store</label>
       <select id="rev-biz">

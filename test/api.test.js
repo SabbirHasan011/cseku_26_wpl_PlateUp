@@ -15,6 +15,9 @@ const pool = new Pool({
 
 const testEmail = `test-${Date.now()}@plateup.test`;
 const testListingTitle = `Automated test listing ${Date.now()}`;
+const testReviewItem = `Automated review item ${Date.now()}`;
+let createdListingId;
+let createdReviewId;
 
 async function requestJson(path, options) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -27,6 +30,7 @@ async function requestJson(path, options) {
 
 test.after(async () => {
   await pool.query('DELETE FROM listings WHERE title = $1', [testListingTitle]);
+  await pool.query('DELETE FROM reviews WHERE item_name = $1', [testReviewItem]);
   await pool.query('DELETE FROM users WHERE email = $1', [testEmail]);
   await pool.end();
 });
@@ -95,6 +99,7 @@ test('creating a listing persists it in PostgreSQL', async () => {
 
   assert.equal(response.status, 201);
   assert.equal(body.listing.title, testListingTitle);
+  createdListingId = body.listing.id;
 
   const result = await pool.query(
     'SELECT title, category, quantity FROM listings WHERE title = $1',
@@ -106,4 +111,79 @@ test('creating a listing persists it in PostgreSQL', async () => {
     category: 'Automated Test',
     quantity: 2
   });
+});
+
+test('listing CRUD supports reading, updating, and deleting a listing', async () => {
+  const read = await requestJson(`/listings/${createdListingId}`);
+  assert.equal(read.response.status, 200);
+  assert.equal(read.body.listing.id, createdListingId);
+
+  const update = await requestJson(`/listings/${createdListingId}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      title: testListingTitle,
+      category: 'Updated Test',
+      business_name: 'Updated Kitchen',
+      original_price: 150,
+      rescue_price: 75,
+      quantity: 4
+    })
+  });
+  assert.equal(update.response.status, 200);
+  assert.equal(update.body.listing.category, 'Updated Test');
+  assert.equal(update.body.listing.quantity, 4);
+
+  const invalid = await requestJson(`/listings/${createdListingId}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      title: testListingTitle,
+      category: 'Updated Test',
+      original_price: 10,
+      rescue_price: 20,
+      quantity: 1
+    })
+  });
+  assert.equal(invalid.response.status, 400);
+
+  const remove = await requestJson(`/listings/${createdListingId}`, { method: 'DELETE' });
+  assert.equal(remove.response.status, 200);
+
+  const missing = await requestJson(`/listings/${createdListingId}`);
+  assert.equal(missing.response.status, 404);
+});
+
+test('review CRUD supports creating, updating, and deleting a review', async () => {
+  const create = await requestJson('/reviews', {
+    method: 'POST',
+    body: JSON.stringify({
+      business_name: 'Test Kitchen',
+      item_name: testReviewItem,
+      author_name: 'Automated Tester',
+      rating: 4,
+      comment: 'Good test meal.'
+    })
+  });
+  assert.equal(create.response.status, 201);
+  createdReviewId = create.body.review.id;
+
+  const update = await requestJson(`/reviews/${createdReviewId}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      business_name: 'Test Kitchen',
+      item_name: testReviewItem,
+      author_name: 'Automated Tester',
+      rating: 5,
+      comment: 'Excellent test meal.',
+      reply: 'Thank you for testing.'
+    })
+  });
+  assert.equal(update.response.status, 200);
+  assert.equal(update.body.review.rating, 5);
+  assert.equal(update.body.review.reply, 'Thank you for testing.');
+
+  const remove = await requestJson(`/reviews/${createdReviewId}`, { method: 'DELETE' });
+  assert.equal(remove.response.status, 200);
+
+  const missing = await requestJson(`/reviews/${createdReviewId}`);
+  assert.equal(missing.response.status, 404);
 });

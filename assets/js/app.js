@@ -8,6 +8,10 @@ let currentUser = null;
 let activeScreen = 'home';
 let cartItems = [];
 let orderHistory = [];
+let selectedReviewOrder = null;
+let reviewCarouselTimer = null;
+let editingListingId = null;
+let editingReviewId = null;
 
 function persistSession() {
   if (currentUser) {
@@ -87,7 +91,7 @@ function renderProfile() {
         <span>${order.date}</span>
       </div>
       <div class="order-items">${order.items.map(item => `<span>${item.title} · ${item.biz}</span>`).join('')}</div>
-      <div class="order-total"><strong>৳${order.total}</strong><span class="badge active">Completed</span></div>
+      <div class="order-total"><strong>৳${order.total}</strong><span class="badge active">Completed</span><button class="review-order-btn" onclick="openReviewModal('${order.id}')">Leave Review</button></div>
     </div>
   `).join('');
 }
@@ -113,7 +117,7 @@ async function loadInitialData() {
       requestJson(`${API_BASE}/reviews`)
     ]);
 
-    if (Array.isArray(listingData) && listingData.length > 0) {
+    if (Array.isArray(listingData)) {
       listings.splice(0, listings.length, ...listingData.map(item => ({
         id: item.id,
         title: item.title,
@@ -128,7 +132,7 @@ async function loadInitialData() {
       })));
     }
 
-    if (Array.isArray(reviewData) && reviewData.length > 0) {
+    if (Array.isArray(reviewData)) {
       reviewsDatabase.splice(0, reviewsDatabase.length, ...reviewData.map(review => ({
         id: review.id,
         biz: review.business_name,
@@ -146,6 +150,42 @@ async function loadInitialData() {
 
   renderListings();
   renderReviews();
+  renderHomeReviews();
+}
+
+function renderHomeReviews() {
+  const carousel = document.getElementById('home-reviews-carousel');
+  const dots = document.getElementById('review-carousel-dots');
+  if (!carousel || !dots) return;
+
+  const publicReviews = reviewsDatabase.slice(0, 6);
+  if (publicReviews.length === 0) {
+    carousel.innerHTML = '<div class="empty-history">Customer reviews will appear here.</div>';
+    dots.innerHTML = '';
+    return;
+  }
+
+  carousel.innerHTML = publicReviews.map((review, index) => `
+    <article class="home-review-slide ${index === 0 ? 'active' : ''}">
+      <div class="home-review-stars">${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)}</div>
+      <blockquote>“${review.comment}”</blockquote>
+      <div class="home-review-author"><strong>${review.author}</strong><span>${review.biz} · ${review.item}</span></div>
+    </article>
+  `).join('');
+  dots.innerHTML = publicReviews.map((_, index) => `<button class="${index === 0 ? 'active' : ''}" aria-label="Show review ${index + 1}" onclick="showReviewSlide(${index})"></button>`).join('');
+
+  if (reviewCarouselTimer) clearInterval(reviewCarouselTimer);
+  if (publicReviews.length > 1) {
+    reviewCarouselTimer = setInterval(() => {
+      const activeIndex = [...document.querySelectorAll('.home-review-slide')].findIndex(slide => slide.classList.contains('active'));
+      showReviewSlide((activeIndex + 1) % publicReviews.length);
+    }, 5000);
+  }
+}
+
+function showReviewSlide(index) {
+  document.querySelectorAll('.home-review-slide').forEach((slide, slideIndex) => slide.classList.toggle('active', slideIndex === index));
+  document.querySelectorAll('.review-carousel-dots button').forEach((dot, dotIndex) => dot.classList.toggle('active', dotIndex === index));
 }
 
 function switchAuthMode(mode, tabEl) {
@@ -412,6 +452,7 @@ function renderListings() {
         <td>${item.qty} units</td>
         <td class="rowprice">৳${item.rescue}</td>
         <td><span class="badge ${badgeClass}">${statusText}</span></td>
+        <td class="table-actions"><button class="review-order-btn" onclick="openEditListingModal(${item.id})">Edit</button><button class="review-order-btn danger-action" onclick="deleteListing(${item.id})">Delete</button></td>
       </tr>
     `;
   });
@@ -466,24 +507,57 @@ function renderReviews() {
         </div>
         <div class="review-item-name">Meal Rescued: ${rev.item}</div>
         <div class="review-comment">"${rev.comment}"</div>
+        <div class="review-actions"><button class="review-order-btn" onclick="openEditReviewModal(${rev.id})">Edit</button><button class="review-order-btn danger-action" onclick="deleteReview(${rev.id})">Delete</button></div>
         ${replyHtml}
       </div>
     `;
   });
 }
 
-function submitReviewReply(reviewId) {
+async function submitReviewReply(reviewId) {
   const input = document.getElementById(`reply-input-${reviewId}`);
   if (!input || !input.value.trim()) return;
 
   const rev = reviewsDatabase.find(r => r.id === reviewId);
-  if (rev) {
-    rev.reply = input.value.trim();
+  if (!rev) return;
+
+  try {
+    const data = await requestJson(`${API_BASE}/reviews/${reviewId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        business_name: rev.biz,
+        item_name: rev.item,
+        author_name: rev.author,
+        rating: rev.rating,
+        comment: rev.comment,
+        reply: input.value.trim()
+      })
+    });
+    rev.reply = data.review.reply;
     renderReviews();
+    renderHomeReviews();
+  } catch (error) {
+    alert(error.message);
   }
 }
 
-function openReviewModal() {
+function openReviewModal(orderId) {
+  editingReviewId = null;
+  selectedReviewOrder = orderHistory.find(order => order.id === orderId) || null;
+  const context = document.getElementById('review-order-context');
+  if (selectedReviewOrder) {
+    const firstItem = selectedReviewOrder.items[0];
+    const businessName = firstItem.biz.replace(/ · Local$/, '');
+    const businessSelect = document.getElementById('rev-biz');
+    if (![...businessSelect.options].some(option => option.value === businessName)) {
+      businessSelect.add(new Option(businessName, businessName));
+    }
+    businessSelect.value = businessName;
+    document.getElementById('rev-item').value = firstItem.title;
+    context.innerText = `Reviewing order #${selectedReviewOrder.id}`;
+  } else {
+    context.innerText = '';
+  }
   document.getElementById('review-modal').classList.add('active');
 }
 
@@ -498,39 +572,47 @@ async function submitCustomerReview() {
     return;
   }
 
+  const isEditing = Boolean(editingReviewId);
   try {
-    await requestJson(`${API_BASE}/reviews`, {
-      method: 'POST',
-      body: JSON.stringify({
-        business_name: biz,
-        item_name: item,
-        author_name: currentUser ? currentUser.name : 'Verified Customer',
-        rating,
-        comment
-      })
-    });
-  } catch (error) {
-    const newReview = {
-      id: reviewsDatabase.length + 1,
-      biz,
-      author: currentUser ? currentUser.name : 'Verified Customer',
+    const payload = {
+      business_name: biz,
+      item_name: item,
+      author_name: currentUser ? currentUser.name : 'Verified Customer',
       rating,
-      time: 'Just now',
-      item,
-      comment,
-      reply: null
+      comment
     };
-
-    reviewsDatabase.unshift(newReview);
+    const data = editingReviewId
+      ? await requestJson(`${API_BASE}/reviews/${editingReviewId}`, { method: 'PUT', body: JSON.stringify(payload) })
+      : await requestJson(`${API_BASE}/reviews`, { method: 'POST', body: JSON.stringify(payload) });
+    const review = data.review;
+    const mappedReview = {
+      id: review.id,
+      biz: review.business_name,
+      author: review.author_name || 'Verified Customer',
+      rating: Number(review.rating),
+      time: 'Just now',
+      item: review.item_name,
+      comment: review.comment,
+      reply: review.reply || null
+    };
+    const existingIndex = reviewsDatabase.findIndex(reviewItem => reviewItem.id === mappedReview.id);
+    if (existingIndex >= 0) reviewsDatabase.splice(existingIndex, 1, mappedReview);
+    else reviewsDatabase.unshift(mappedReview);
+    editingReviewId = null;
+    alert(isEditing ? 'Review updated.' : 'Thank you! Your feedback has been submitted to the restaurant.');
+  } catch (error) {
+    alert(error.message);
+    return;
   }
-
-  alert('Thank you! Your feedback has been submitted to the restaurant.');
 
   document.getElementById('rev-item').value = '';
   document.getElementById('rev-comment').value = '';
+  document.getElementById('rev-rating').value = '5';
   closeModal('review-modal');
 
   renderReviews();
+  renderHomeReviews();
+  selectedReviewOrder = null;
 }
 
 function switchBizTab(tabName, el) {
@@ -609,7 +691,42 @@ function showScreen(screenId) {
 }
 
 function openNewListingModal() {
+  editingListingId = null;
+  document.getElementById('listing-modal-title').innerText = 'Create Surplus Listing';
+  document.getElementById('listing-submit-btn').innerText = 'Publish Listing';
+  document.getElementById('m-title').value = '';
+  document.getElementById('m-qty').value = '1';
+  document.getElementById('m-orig-price').value = '';
+  document.getElementById('m-rescue-price').value = '';
   document.getElementById('new-listing-modal').classList.add('active');
+}
+
+function openEditListingModal(id) {
+  const item = listings.find(listing => listing.id === id);
+  if (!item) return;
+  editingListingId = id;
+  document.getElementById('listing-modal-title').innerText = 'Edit Surplus Listing';
+  document.getElementById('listing-submit-btn').innerText = 'Save Changes';
+  document.getElementById('m-title').value = item.title;
+  document.getElementById('m-category').value = item.category;
+  document.getElementById('m-qty').value = item.qty;
+  document.getElementById('m-orig-price').value = item.orig;
+  document.getElementById('m-rescue-price').value = item.rescue;
+  document.getElementById('new-listing-modal').classList.add('active');
+}
+
+async function deleteListing(id) {
+  const item = listings.find(listing => listing.id === id);
+  if (!item || !confirm(`Delete "${item.title}"?`)) return;
+
+  try {
+    await requestJson(`${API_BASE}/listings/${id}`, { method: 'DELETE' });
+    const index = listings.findIndex(listing => listing.id === id);
+    if (index >= 0) listings.splice(index, 1);
+    renderListings();
+  } catch (error) {
+    alert(error.message);
+  }
 }
 
 function openCheckoutModal() {
@@ -626,43 +743,76 @@ function closeModal(id) {
 }
 
 async function submitNewListing() {
-  const title = document.getElementById('m-title').value || 'Surplus Box';
+  const title = document.getElementById('m-title').value.trim();
   const category = document.getElementById('m-category').value;
-  const qty = parseInt(document.getElementById('m-qty').value, 10) || 1;
-  const orig = parseInt(document.getElementById('m-orig-price').value, 10) || 300;
-  const rescue = parseInt(document.getElementById('m-rescue-price').value, 10) || 120;
+  const qty = parseInt(document.getElementById('m-qty').value, 10);
+  const orig = Number(document.getElementById('m-orig-price').value);
+  const rescue = Number(document.getElementById('m-rescue-price').value);
 
-  try {
-    await requestJson(`${API_BASE}/listings`, {
-      method: 'POST',
-      body: JSON.stringify({
-        title,
-        category,
-        business_name: currentUser ? currentUser.name : 'Spice Trail Kitchen',
-        original_price: orig,
-        rescue_price: rescue,
-        quantity: qty
-      })
-    });
-  } catch (error) {
-    const newItem = {
-      id: listings.length + 1,
-      title,
-      category,
-      biz: currentUser ? `${currentUser.name} · Local` : 'Spice Trail Kitchen · Local',
-      orig,
-      rescue,
-      qty,
-      discount: `-${Math.round((1 - rescue / orig) * 100)}%`,
-      time: 'Ends in 3h',
-      aiRecommended: true
-    };
-
-    listings.unshift(newItem);
+  if (!title || !Number.isInteger(qty) || qty < 1 || !Number.isFinite(orig) || orig < 0 || !Number.isFinite(rescue) || rescue < 0 || rescue > orig) {
+    alert('Enter a title, a positive quantity, and valid prices. Rescue price cannot exceed original price.');
+    return;
   }
 
-  renderListings();
-  closeModal('new-listing-modal');
+  try {
+    const payload = {
+      title,
+      category,
+      business_name: currentUser ? currentUser.name : 'Spice Trail Kitchen',
+      original_price: orig,
+      rescue_price: rescue,
+      quantity: qty
+    };
+    const data = editingListingId
+      ? await requestJson(`${API_BASE}/listings/${editingListingId}`, { method: 'PUT', body: JSON.stringify(payload) })
+      : await requestJson(`${API_BASE}/listings`, { method: 'POST', body: JSON.stringify(payload) });
+    const item = data.listing;
+    const mappedItem = {
+      id: item.id,
+      title: item.title,
+      category: item.category,
+      biz: `${item.business_name} · Local`,
+      orig: Number(item.original_price),
+      rescue: Number(item.rescue_price),
+      qty: Number(item.quantity),
+      discount: `-${Math.round((1 - (Number(item.rescue_price) / (Number(item.original_price) || 1))) * 100)}%`,
+      time: 'Ends in 3h',
+      aiRecommended: false
+    };
+    const existingIndex = listings.findIndex(listing => listing.id === mappedItem.id);
+    if (existingIndex >= 0) listings.splice(existingIndex, 1, mappedItem);
+    else listings.unshift(mappedItem);
+    editingListingId = null;
+    renderListings();
+    closeModal('new-listing-modal');
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function openEditReviewModal(id) {
+  const review = reviewsDatabase.find(reviewItem => reviewItem.id === id);
+  if (!review) return;
+  editingReviewId = id;
+  document.getElementById('rev-biz').value = review.biz;
+  document.getElementById('rev-item').value = review.item;
+  document.getElementById('rev-rating').value = review.rating;
+  document.getElementById('rev-comment').value = review.comment;
+  document.getElementById('review-order-context').innerText = 'Editing your review';
+  document.getElementById('review-modal').classList.add('active');
+}
+
+async function deleteReview(id) {
+  if (!confirm('Delete this review?')) return;
+  try {
+    await requestJson(`${API_BASE}/reviews/${id}`, { method: 'DELETE' });
+    const index = reviewsDatabase.findIndex(review => review.id === id);
+    if (index >= 0) reviewsDatabase.splice(index, 1);
+    renderReviews();
+    renderHomeReviews();
+  } catch (error) {
+    alert(error.message);
+  }
 }
 
 function confirmOrder() {
