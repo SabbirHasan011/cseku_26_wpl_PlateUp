@@ -1,842 +1,642 @@
-const API_BASE = 'http://localhost:5000/api';
-
-let cartCount = 0;
-let activeCategory = 'All';
-let selectedRole = 'customer';
-let authMode = 'login';
+const API_BASE = location.protocol !== 'file:' && location.port !== '5500' ? '/api' :
+  'http://' + (location.hostname || 'localhost') + ':5000/api';
+let token = localStorage.getItem('plateup_token');
 let currentUser = null;
-let activeScreen = 'home';
+let profile = null;
+let listings = [];
+let businessListings = [];
+let reviews = [];
+let orders = [];
+let businessOrders = [];
 let cartItems = [];
-let orderHistory = [];
-let selectedReviewOrder = null;
-let reviewCarouselTimer = null;
+let selectedRole = 'customer';
+let activeCategory = 'All';
+let activeScreen = 'home';
 let editingListingId = null;
 let editingReviewId = null;
+let selectedReviewOrder = null;
+let carouselTimer = null;
+let latestListingsRequest = 0;
+let listingPreviewUrl = null;
 
-function persistSession() {
-  if (currentUser) {
-    localStorage.setItem('plateup_user', JSON.stringify(currentUser));
-  }
-}
+const el = id => document.getElementById(id);
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char =>
+  ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[char]);
+const money = amount => '৳' + Number(amount || 0).toFixed(2);
+const date = value => value ? new Date(value).toLocaleString() : 'Any time';
+const offerTime = value => {
+  if (!value) return 'Not set';
+  const [hour,minute] = value.slice(0,5).split(':').map(Number);
+  return (hour % 12 || 12) + ':' + String(minute).padStart(2,'0') + (hour < 12 ? ' AM' : ' PM');
+};
+const imageUrl = path => path ? API_BASE.replace(/\/api$/,'') + path : '';
+const itemThumbnail = item => '<div class="food-thumb">' + (item.image_path
+  ? '<img src="' + escapeHtml(imageUrl(item.image_path)) + '" alt="' + escapeHtml(item.title) + '" loading="lazy">'
+  : '<span class="initial">' + escapeHtml(item.title.slice(0,2)) + '</span>') + '</div>';
 
-function restoreSession() {
-  const savedUser = localStorage.getItem('plateup_user');
-
-  if (!savedUser || !localStorage.getItem('plateup_token')) return;
-
+async function requestJson(path, options = {}) {
+  let response;
   try {
-    currentUser = JSON.parse(savedUser);
-    loadOrderHistory();
-    if (currentUser.role === 'business') {
-      document.getElementById('biz-name-text').innerText = currentUser.name;
-      document.getElementById('biz-avatar-text').innerText = currentUser.name.substring(0, 2).toUpperCase();
-    }
+    response = await fetch(API_BASE + path, {
+      ...options,
+      headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type':'application/json' }),
+        ...(token ? { Authorization:'Bearer ' + token } : {}), ...(options.headers || {}) }
+    });
   } catch (error) {
-    localStorage.removeItem('plateup_user');
-    localStorage.removeItem('plateup_token');
+    throw new Error('Cannot connect to PlateUp at ' + API_BASE + '. Run npm start, then open http://localhost:5000/.');
   }
-}
-
-function orderHistoryKey() {
-  return currentUser ? `plateup_orders_${currentUser.email.toLowerCase()}` : null;
-}
-
-function loadOrderHistory() {
-  const key = orderHistoryKey();
-  if (!key) {
-    orderHistory = [];
-    return;
+  if (!response.headers.get('Content-Type')?.includes('application/json')) {
+    throw new Error('PlateUp API is unavailable at ' + API_BASE + '. Run npm start, then open http://localhost:5000/.');
   }
-
-  try {
-    const savedOrders = JSON.parse(localStorage.getItem(key) || '[]');
-    orderHistory = Array.isArray(savedOrders) ? savedOrders : [];
-  } catch (error) {
-    orderHistory = [];
-  }
-}
-
-function saveOrderHistory() {
-  const key = orderHistoryKey();
-  if (key) localStorage.setItem(key, JSON.stringify(orderHistory));
-}
-
-function renderProfile() {
-  if (!currentUser) {
-    showScreen('login');
-    return;
-  }
-
-  const name = currentUser.name || 'PlateUp User';
-  const email = currentUser.email || '';
-  const mealCount = orderHistory.reduce((total, order) => total + order.items.length, 0);
-
-  document.getElementById('profile-avatar').innerText = name.substring(0, 2).toUpperCase();
-  document.getElementById('profile-name').innerText = name;
-  document.getElementById('profile-email').innerText = email;
-  document.getElementById('profile-role').innerText = currentUser.role === 'business' ? 'Business' : 'Customer';
-  document.getElementById('profile-order-count').innerText = orderHistory.length;
-  document.getElementById('profile-meal-count').innerText = mealCount;
-
-  const history = document.getElementById('order-history');
-  if (orderHistory.length === 0) {
-    history.innerHTML = '<div class="empty-history">Your completed reservations will appear here.</div>';
-    return;
-  }
-
-  history.innerHTML = orderHistory.map(order => `
-    <div class="order-row">
-      <div class="order-main">
-        <strong>Order #${order.id}</strong>
-        <span>${order.date}</span>
-      </div>
-      <div class="order-items">${order.items.map(item => `<span>${item.title} · ${item.biz}</span>`).join('')}</div>
-      <div class="order-total"><strong>৳${order.total}</strong><span class="badge active">Completed</span><button class="review-order-btn" onclick="openReviewModal('${order.id}')">Leave Review</button></div>
-    </div>
-  `).join('');
-}
-
-async function requestJson(url, options = {}) {
-  const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options
-  });
-
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401 && token && !path.startsWith('/auth/')) handleLogout();
     throw new Error(data.message || 'Request failed');
   }
-
   return data;
+}
+
+async function fetchListings() {
+  const requestId = ++latestListingsRequest;
+  const freshListings = await requestJson('/listings', { cache:'no-store' });
+  if (requestId !== latestListingsRequest) return;
+  listings = freshListings;
+  renderListings();
+}
+
+async function refreshMarketplace() {
+  el('listing-status').textContent = 'Refreshing listings…';
+  try { await fetchListings(); }
+  catch (error) {
+    console.error(error);
+    el('listing-status').textContent = 'Could not refresh listings: ' + error.message;
+  }
 }
 
 async function loadInitialData() {
   try {
-    const [listingData, reviewData] = await Promise.all([
-      requestJson(`${API_BASE}/listings`),
-      requestJson(`${API_BASE}/reviews`)
-    ]);
-
-    if (Array.isArray(listingData)) {
-      listings.splice(0, listings.length, ...listingData.map(item => ({
-        id: item.id,
-        title: item.title,
-        category: item.category,
-        biz: item.business_name ? `${item.business_name} · Local` : item.biz || 'Local Business',
-        orig: Number(item.original_price || item.orig || 0),
-        rescue: Number(item.rescue_price || item.rescue || 0),
-        qty: Number(item.quantity || item.qty || 0),
-        discount: item.discount || `-${Math.round((1 - (Number(item.rescue_price || item.rescue || 0) / (Number(item.original_price || item.orig || 1)))) * 100)}%`,
-        time: item.time || 'Ends in 3h',
-        aiRecommended: Boolean(item.aiRecommended)
-      })));
-    }
-
-    if (Array.isArray(reviewData)) {
-      reviewsDatabase.splice(0, reviewsDatabase.length, ...reviewData.map(review => ({
-        id: review.id,
-        biz: review.business_name,
-        author: review.author_name || 'Verified Customer',
-        rating: Number(review.rating || 5),
-        time: review.time || 'Just now',
-        item: review.item_name,
-        comment: review.comment,
-        reply: review.reply || null
-      })));
-    }
-  } catch (error) {
-    console.warn('Backend unavailable, using fallback demo data:', error.message);
-  }
-
-  renderListings();
-  renderReviews();
-  renderHomeReviews();
+    await Promise.all([fetchListings(), requestJson('/reviews').then(data => { reviews = data; })]);
+    renderReviews();
+    renderHomeReviews();
+  } catch (error) { console.error(error); alert('Could not load marketplace data: ' + error.message); }
 }
 
-function renderHomeReviews() {
-  const carousel = document.getElementById('home-reviews-carousel');
-  const dots = document.getElementById('review-carousel-dots');
-  if (!carousel || !dots) return;
-
-  const publicReviews = reviewsDatabase.slice(0, 6);
-  if (publicReviews.length === 0) {
-    carousel.innerHTML = '<div class="empty-history">Customer reviews will appear here.</div>';
-    dots.innerHTML = '';
-    return;
-  }
-
-  carousel.innerHTML = publicReviews.map((review, index) => `
-    <article class="home-review-slide ${index === 0 ? 'active' : ''}">
-      <div class="home-review-stars">${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)}</div>
-      <blockquote>“${review.comment}”</blockquote>
-      <div class="home-review-author"><strong>${review.author}</strong><span>${review.biz} · ${review.item}</span></div>
-    </article>
-  `).join('');
-  dots.innerHTML = publicReviews.map((_, index) => `<button class="${index === 0 ? 'active' : ''}" aria-label="Show review ${index + 1}" onclick="showReviewSlide(${index})"></button>`).join('');
-
-  if (reviewCarouselTimer) clearInterval(reviewCarouselTimer);
-  if (publicReviews.length > 1) {
-    reviewCarouselTimer = setInterval(() => {
-      const activeIndex = [...document.querySelectorAll('.home-review-slide')].findIndex(slide => slide.classList.contains('active'));
-      showReviewSlide((activeIndex + 1) % publicReviews.length);
-    }, 5000);
-  }
-}
-
-function showReviewSlide(index) {
-  document.querySelectorAll('.home-review-slide').forEach((slide, slideIndex) => slide.classList.toggle('active', slideIndex === index));
-  document.querySelectorAll('.review-carousel-dots button').forEach((dot, dotIndex) => dot.classList.toggle('active', dotIndex === index));
-}
-
-function switchAuthMode(mode, tabEl) {
-  authMode = mode;
-  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-  tabEl.classList.add('active');
-
-  clearAuthBanners();
-
-  const loginForm = document.getElementById('form-login');
-  const signupForm = document.getElementById('form-signup');
-  const title = document.getElementById('auth-title');
-  const desc = document.getElementById('auth-desc');
-
-  if (mode === 'login') {
-    loginForm.classList.add('active');
-    signupForm.classList.remove('active');
-    title.innerText = 'Welcome Back';
-    desc.innerText = 'Select your account role to continue';
-  } else {
-    loginForm.classList.remove('active');
-    signupForm.classList.add('active');
-    title.innerText = 'Create Account';
-    desc.innerText = 'Join PlateUp to rescue fresh surplus food';
-  }
-}
-
-function selectRole(role, el) {
-  selectedRole = role;
-  document.querySelectorAll('.role-opt').forEach(opt => opt.classList.remove('selected'));
-  el.classList.add('selected');
-  clearAuthBanners();
-
-  const loginEmail = document.getElementById('login-email');
-  const nameLabel = document.getElementById('name-label');
-
-  if (role === 'customer') {
-    loginEmail.value = 'user@plateup.com';
-    nameLabel.innerText = 'Full Name';
-  } else {
-    loginEmail.value = 'spicetrail@plateup.com';
-    nameLabel.innerText = 'Business / Restaurant Name';
-  }
-}
-
-function showAuthError(msg) {
-  const banner = document.getElementById('auth-error-banner');
-  banner.innerText = msg;
-  banner.style.display = 'block';
-  document.getElementById('auth-success-banner').style.display = 'none';
-}
-
-function showAuthSuccess(msg) {
-  const banner = document.getElementById('auth-success-banner');
-  banner.innerText = msg;
-  banner.style.display = 'block';
-  document.getElementById('auth-error-banner').style.display = 'none';
-}
-
-function clearAuthBanners() {
-  document.getElementById('auth-error-banner').style.display = 'none';
-  document.getElementById('auth-success-banner').style.display = 'none';
-}
-
-async function handleLogin(e) {
-  e.preventDefault();
-  clearAuthBanners();
-
-  const email = document.getElementById('login-email').value.trim();
-  const pass = document.getElementById('login-pass').value;
-
+async function loadAccount(throwOnFailure = false) {
+  if (!token) return;
   try {
-    const data = await requestJson(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      body: JSON.stringify({ email, password: pass, role: selectedRole })
-    });
-
-    currentUser = data.user;
-    localStorage.setItem('plateup_token', data.token || '');
-    persistSession();
-    loadOrderHistory();
+    const data = await requestJson('/me');
+    profile = data.profile;
+    currentUser = { id:profile.id, name:profile.name, email:profile.email, role:profile.role };
     renderTopNav();
-
-    if (currentUser.role === 'business') {
-      document.getElementById('biz-name-text').innerText = currentUser.name;
-      document.getElementById('biz-avatar-text').innerText = currentUser.name.substring(0, 2).toUpperCase();
-      showScreen('business');
-      renderReviews();
+    if (currentUser.role === 'customer') {
+      orders = await requestJson('/orders');
+      renderProfile();
     } else {
-      showScreen('customer');
+      await loadBusiness();
     }
   } catch (error) {
-    const match = usersDatabase.find(u => u.email === email && u.pass === pass && u.role === selectedRole);
-    if (match) {
-      currentUser = match;
-      localStorage.setItem('plateup_token', 'demo-session');
-      persistSession();
-      loadOrderHistory();
-      renderTopNav();
-      if (currentUser.role === 'business') {
-        document.getElementById('biz-name-text').innerText = currentUser.name;
-        document.getElementById('biz-avatar-text').innerText = currentUser.name.substring(0, 2).toUpperCase();
-        showScreen('business');
-        renderReviews();
-      } else {
-        showScreen('customer');
-      }
-      return;
-    }
-
-    showAuthError(`Invalid ${selectedRole} email or password.`);
+    if (throwOnFailure) throw error;
+    console.warn(error.message);
   }
 }
 
-async function handleSignup(e) {
-  e.preventDefault();
-  clearAuthBanners();
-
-  const name = document.getElementById('signup-name').value.trim();
-  const email = document.getElementById('signup-email').value.trim();
-  const pass = document.getElementById('signup-pass').value;
-  const passConfirm = document.getElementById('signup-pass-confirm').value;
-
-  if (pass !== passConfirm) {
-    showAuthError('Passwords do not match. Please re-enter.');
-    return;
-  }
-
+async function loadBusiness() {
+  if (!currentUser || currentUser.role !== 'business') return;
   try {
-    const data = await requestJson(`${API_BASE}/auth/signup`, {
-      method: 'POST',
-      body: JSON.stringify({ name, email, password: pass, role: selectedRole })
-    });
-
-    usersDatabase.push({
-      name: data.user.name,
-      email: data.user.email,
-      pass,
-      role: data.user.role
-    });
-  } catch (error) {
-    const exists = usersDatabase.some(u => u.email === email);
-    if (exists) {
-      showAuthError('An account with this email address already exists.');
-      return;
-    }
-
-    usersDatabase.push({ name, email, pass, role: selectedRole });
-  }
-
-  document.getElementById('signup-name').value = '';
-  document.getElementById('signup-email').value = '';
-  document.getElementById('signup-pass').value = '';
-  document.getElementById('signup-pass-confirm').value = '';
-
-  switchAuthMode('login', document.querySelectorAll('.auth-tab')[0]);
-  document.getElementById('login-email').value = email;
-  document.getElementById('login-pass').value = pass;
-
-  showAuthSuccess('Account created successfully! Click Sign In to continue.');
+    const [own, incoming, analytics, predictions] = await Promise.all([
+      requestJson('/business/listings'), requestJson('/orders'),
+      requestJson('/business/analytics'), requestJson('/business/predictions')
+    ]);
+    businessListings = own;
+    businessOrders = incoming;
+    renderBusinessOrders();
+    renderListings();
+    el('biz-active-count').textContent = analytics.summary.active_listings;
+    el('biz-meals-count').textContent = analytics.summary.meals_rescued;
+    el('biz-revenue').textContent = money(analytics.summary.revenue);
+    el('business-sales').innerHTML = analytics.sales.length
+      ? analytics.sales.map(s => '<div class="order-row"><strong>' + escapeHtml(s.title) + '</strong><span>' +
+        s.quantity_sold + ' sold · ' + money(s.price) + '</span><span>' + date(s.sale_time) + '</span></div>').join('')
+      : '<div class="empty-history">No completed sales yet.</div>';
+    el('business-predictions').textContent = predictions.length
+      ? predictions.map(p => p.prediction_type + ': ' + p.predicted_value).join(' · ')
+      : 'No predictions yet. The ML module has not been developed.';
+    el('biz-name-text').textContent = profile.business_name || currentUser.name;
+    el('biz-avatar-text').textContent = (profile.business_name || currentUser.name).slice(0,2).toUpperCase();
+    el('biz-role-text').textContent = 'Business ID: ' + currentUser.id;
+    renderReviews();
+  } catch (error) { alert('Could not load business data: ' + error.message); }
+}
+async function refreshBusinessListings() {
+  if (currentUser?.role!=='business') return;
+  try {
+    businessListings=await requestJson('/business/listings',{ cache:'no-store' });
+    renderListings();
+    el('biz-active-count').textContent=businessListings.filter(item=>item.daily_status==='Active').length;
+  } catch(error) { console.error(error); }
 }
 
+function switchAuthMode(mode, tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  el('form-login').classList.toggle('active', mode === 'login');
+  el('form-signup').classList.toggle('active', mode === 'signup');
+  el('auth-title').textContent = mode === 'login' ? 'Welcome Back' : 'Create Account';
+  el('auth-desc').textContent = mode === 'login' ? 'Select your account role to continue' : 'Join PlateUp';
+  clearAuthBanners();
+}
+function selectRole(role, element) {
+  selectedRole = role;
+  document.querySelectorAll('.role-opt').forEach(item => item.classList.remove('selected'));
+  element.classList.add('selected');
+  el('name-label').textContent = role === 'business' ? 'Business name' : 'Full name';
+}
+function clearAuthBanners() {
+  el('auth-error-banner').style.display = 'none';
+  el('auth-success-banner').style.display = 'none';
+}
+function showAuthError(message) {
+  el('auth-error-banner').textContent = message;
+  el('auth-error-banner').style.display = 'block';
+}
+function showAuthSuccess(message) {
+  el('auth-success-banner').textContent = message;
+  el('auth-success-banner').style.display = 'block';
+}
+async function handleLogin(event) {
+  event.preventDefault(); clearAuthBanners();
+  try {
+    const data = await requestJson('/auth/login', { method:'POST', body:JSON.stringify({
+      email:el('login-email').value.trim(), password:el('login-pass').value, role:selectedRole
+    }) });
+    token = data.token;
+    localStorage.setItem('plateup_token', token);
+    await loadAccount(true);
+    if (!currentUser) throw new Error('Could not load your account. Please try again.');
+    showScreen(currentUser.role === 'business' ? 'business' : 'customer');
+  } catch (error) {
+    if (!currentUser) {
+      token = null;
+      localStorage.removeItem('plateup_token');
+    }
+    showAuthError(error.message);
+  }
+}
+async function handleSignup(event) {
+  event.preventDefault(); clearAuthBanners();
+  const password = el('signup-pass').value;
+  if (password !== el('signup-pass-confirm').value) return showAuthError('Passwords do not match');
+  try {
+    await requestJson('/auth/signup', { method:'POST', body:JSON.stringify({
+      name:el('signup-name').value.trim(), email:el('signup-email').value.trim(), password, role:selectedRole
+    }) });
+    el('login-email').value = el('signup-email').value.trim();
+    el('login-pass').value = '';
+    el('form-signup').reset();
+    switchAuthMode('login', document.querySelector('.auth-tab'));
+    showAuthSuccess('Account created. Sign in to continue.');
+  } catch (error) { showAuthError(error.message); }
+}
 function handleLogout() {
-  currentUser = null;
+  token = null; currentUser = null; profile = null; orders = []; businessOrders = [];
+  businessListings = []; cartItems = [];
   localStorage.removeItem('plateup_token');
   localStorage.removeItem('plateup_user');
   localStorage.removeItem('plateup_screen');
+  renderTopNav(); renderListings(); showScreen('home');
+}
+function renderTopNav() {
+  const controls = el('nav-controls');
+  const navButton = (screen, label) => '<button class="' + (activeScreen === screen ? 'active' : '') +
+    '" aria-current="' + (activeScreen === screen ? 'page' : 'false') +
+    '" onclick="showScreen(\'' + screen + '\')">' + label + '</button>';
+  const nav = '<div class="switch">' + navButton('home','Home') + navButton('customer','Browse Food') +
+    (currentUser?.role === 'business' ? navButton('business','Business Portal') : '') + '</div>';
+  controls.innerHTML = nav + (currentUser
+    ? (currentUser.role === 'customer' ? '<button class="cart-chip" onclick="openCheckoutModal()">Cart (<span id="cart-count">' +
+      cartItems.length + '</span>)</button>' : '') +
+      '<button class="profile-nav-btn ' + (activeScreen === 'profile' ? 'active' : '') +
+      '" aria-current="' + (activeScreen === 'profile' ? 'page' : 'false') +
+      '" onclick="showScreen(\'profile\')">Profile</button>' +
+      '<button class="logout-btn" onclick="handleLogout()">Logout</button>'
+    : '<button class="btn-pri" onclick="showScreen(\'login\')">Sign In</button>');
+}
+function showScreen(screen) {
+  if (screen === 'profile' && !currentUser) screen = 'login';
+  if (screen === 'business' && currentUser?.role !== 'business') screen = 'customer';
+  activeScreen = screen;
+  localStorage.setItem('plateup_screen', screen);
+  document.querySelectorAll('.screen').forEach(item => item.classList.remove('active'));
+  el(screen).classList.add('active');
   renderTopNav();
-  clearAuthBanners();
-  showScreen('home');
+  if (screen === 'profile') renderProfile();
+  if (screen === 'business') loadBusiness();
+  if (screen === 'home' || screen === 'customer') refreshMarketplace();
 }
 
-function renderTopNav() {
-  const container = document.getElementById('nav-controls');
-
-  if (!currentUser) {
-    container.innerHTML = `
-      <div class="switch">
-        <button class="${activeScreen === 'home' ? 'active' : ''}" onclick="showScreen('home')">Home</button>
-        <button class="${activeScreen === 'customer' ? 'active' : ''}" onclick="showScreen('customer')">Marketplace</button>
-      </div>
-      <button class="btn-pri" style="border-radius:999px; padding: 8px 18px; font-size:13px;" onclick="showScreen('login')">Sign In</button>
-    `;
-    return;
-  }
-
-  if (currentUser.role === 'customer') {
-    container.innerHTML = `
-      <span class="user-badge">CUSTOMER: ${currentUser.email}</span>
-      <button class="cart-chip" onclick="openCheckoutModal()">🛒 Cart (<span id="cart-count">${cartCount}</span>)</button>
-      <div class="switch">
-        <button class="${activeScreen === 'home' ? 'active' : ''}" onclick="showScreen('home')">Home</button>
-        <button class="${activeScreen === 'customer' ? 'active' : ''}" onclick="showScreen('customer')">Browse Food</button>
-      </div>
-      <button class="profile-nav-btn" onclick="showScreen('profile')">Profile</button>
-      <button class="logout-btn" onclick="handleLogout()">Logout</button>
-    `;
-  } else {
-    container.innerHTML = `
-      <span class="user-badge">BUSINESS: ${currentUser.email}</span>
-      <div class="switch">
-        <button class="${activeScreen === 'home' ? 'active' : ''}" onclick="showScreen('home')">Home</button>
-        <button class="${activeScreen === 'customer' ? 'active' : ''}" onclick="showScreen('customer')">Browse Food</button>
-        <button class="${activeScreen === 'business' ? 'active' : ''}" onclick="showScreen('business')">Business Portal</button>
-      </div>
-      <button class="profile-nav-btn" onclick="showScreen('profile')">Profile</button>
-      <button class="logout-btn" onclick="handleLogout()">Logout</button>
-    `;
-  }
+function renderProfile() {
+  if (!currentUser || !profile) return;
+  el('profile-avatar').textContent = currentUser.name.slice(0,2).toUpperCase();
+  el('profile-name').textContent = currentUser.name;
+  el('profile-email').textContent = currentUser.email;
+  el('profile-role').textContent = currentUser.role;
+  el('profile-member-since').textContent = date(profile.created_at);
+  el('profile-edit-name').value = profile.name || '';
+  el('profile-edit-phone').value = profile.phone || '';
+  el('profile-edit-address').value = profile.customer_address || '';
+  el('profile-edit-city').value = profile.customer_city || '';
+  el('profile-edit-location').value = profile.preferred_location || '';
+  const completed = orders.filter(order => order.status === 'completed');
+  el('profile-order-count').textContent = completed.length;
+  el('profile-meal-count').textContent = completed.reduce((sum, order) => sum + order.quantity, 0);
+  el('order-history').innerHTML = orders.length ? orders.map(order => {
+    const review = reviews.find(item => item.order_id === order.id);
+    const action = ['pending','confirmed'].includes(order.status)
+      ? '<button class="review-order-btn" onclick="changeOrder(' + order.id + ',\'cancelled\')">Cancel</button>'
+      : order.status === 'completed'
+        ? '<button class="review-order-btn" onclick="openReviewModal(' + order.id + ')">' + (review ? 'Edit review' : 'Leave review') + '</button>' +
+          (review ? '<button class="review-order-btn danger-action" onclick="deleteReview(' + review.id + ')">Delete review</button>' : '')
+        : '';
+    return '<div class="order-row"><div class="order-main"><strong>Order #' + order.id + '</strong><span>' +
+      date(order.order_time) + '</span></div><div class="order-items">' + escapeHtml(order.listing_title) +
+      ' · ' + escapeHtml(order.business_name) + ' · Qty ' + order.quantity + '</div><div class="order-total"><strong>' +
+      money(order.total_price) + '</strong><span class="badge active">' + escapeHtml(order.status) +
+      '</span>' + action + '</div></div>';
+  }).join('') : '<div class="empty-history">No reservations yet.</div>';
+  el('business-profile-name').value = profile.business_name || '';
+  el('business-profile-phone').value = profile.business_phone || '';
+  el('business-profile-description').value = profile.description || '';
+  el('business-profile-address').value = profile.business_address || '';
+  el('business-profile-city').value = profile.business_city || '';
+  el('business-profile-open').value = (profile.opening_time || '').slice(0,5);
+  el('business-profile-close').value = (profile.closing_time || '').slice(0,5);
+  el('business-profile-lat').value = profile.latitude ?? '';
+  el('business-profile-lon').value = profile.longitude ?? '';
+}
+async function saveProfile(event) {
+  event.preventDefault();
+  try {
+    await requestJson('/me', { method:'PUT', body:JSON.stringify({
+      name:el('profile-edit-name').value, phone:el('profile-edit-phone').value,
+      address:el('profile-edit-address').value, city:el('profile-edit-city').value,
+      preferred_location:el('profile-edit-location').value
+    }) });
+    await loadAccount(); alert('Profile saved.');
+  } catch(error) { alert(error.message); }
+}
+async function saveBusinessProfile(event) {
+  event.preventDefault();
+  try {
+    await requestJson('/me', { method:'PUT', body:JSON.stringify({
+      name:el('business-profile-name').value, business_name:el('business-profile-name').value,
+      phone:el('business-profile-phone').value, description:el('business-profile-description').value,
+      address:el('business-profile-address').value, city:el('business-profile-city').value,
+      opening_time:el('business-profile-open').value, closing_time:el('business-profile-close').value,
+      latitude:el('business-profile-lat').value, longitude:el('business-profile-lon').value
+    }) });
+    await loadAccount(); await loadInitialData(); alert('Business profile saved.');
+  } catch(error) { alert(error.message); }
 }
 
 function renderListings() {
-  const grid = document.getElementById('listing-grid');
-  const homeGrid = document.getElementById('home-featured-grid');
-  const tableBody = document.querySelector('#business-table tbody');
-  const query = document.getElementById('food-search').value.toLowerCase();
-
-  grid.innerHTML = '';
-  if (homeGrid) homeGrid.innerHTML = '';
-  tableBody.innerHTML = '';
-
-  listings.forEach((item, idx) => {
-    const matchesCat = activeCategory === 'All' || item.category === activeCategory;
-    const matchesSearch = item.title.toLowerCase().includes(query) || item.biz.toLowerCase().includes(query);
-
-    const cardMarkup = `
-      <div class="food-card">
-        <div class="food-thumb">
-          <div class="urgency">${item.time}</div>
-          ${item.aiRecommended ? '<div class="ai-tag">AI Optimal</div>' : ''}
-          <span class="initial">${item.title.substring(0, 2)}</span>
-        </div>
-        <div class="food-body">
-          <div class="biz-line">${item.biz}</div>
-          <p class="food-title">${item.title}</p>
-          <div class="food-meta">${item.qty} items left · Pickup today</div>
-          <div class="ticket">
-            <div class="price-block">
-              <span class="orig-price">৳${item.orig}</span>
-              <span class="rescue-price">৳${item.rescue}</span>
-            </div>
-            <span class="save-pill">${item.discount}</span>
-          </div>
-          <button class="reserve-btn" onclick="addToCart(${item.id})">Reserve Meal</button>
-        </div>
-      </div>
-    `;
-
-    if (matchesCat && matchesSearch) {
-      grid.innerHTML += cardMarkup;
-    }
-
-    if (idx < 3 && homeGrid) {
-      homeGrid.innerHTML += cardMarkup;
-    }
-
-    let badgeClass = item.qty > 5 ? 'active' : item.qty > 0 ? 'low' : 'sold';
-    let statusText = item.qty > 5 ? 'Active' : item.qty > 0 ? 'Low Stock' : 'Sold Out';
-
-    tableBody.innerHTML += `
-      <tr>
-        <td><b>${item.title}</b></td>
-        <td>${item.category}</td>
-        <td>${item.qty} units</td>
-        <td class="rowprice">৳${item.rescue}</td>
-        <td><span class="badge ${badgeClass}">${statusText}</span></td>
-        <td class="table-actions"><button class="review-order-btn" onclick="openEditListingModal(${item.id})">Edit</button><button class="review-order-btn danger-action" onclick="deleteListing(${item.id})">Delete</button></td>
-      </tr>
-    `;
+  const query = el('food-search').value.trim().toLowerCase();
+  const city = el('loc-search').value.trim().toLowerCase();
+  const filtersActive = activeCategory !== 'All' || Boolean(query || city);
+  const visible = listings.filter(item => (activeCategory === 'All' || item.category === activeCategory)
+    && (!query || (item.title + ' ' + item.business_name).toLowerCase().includes(query))
+    && (!city || !item.city || item.city.toLowerCase().includes(city.split(',')[0])));
+  el('listing-status').textContent = visible.length + ' of ' + listings.length + ' available listings' +
+    (filtersActive ? ' · Filters active' : '');
+  el('clear-listing-filters').hidden = !filtersActive;
+  const card = item => '<div class="food-card">' + itemThumbnail(item) + '<div class="food-body"><div class="biz-line">' +
+    escapeHtml(item.business_name) + '</div><p class="food-title">' + escapeHtml(item.title) +
+    '</p><div class="food-meta">' + item.quantity + ' available · ' + escapeHtml(item.city || 'Pickup') +
+    ' · Ends ' + offerTime(item.offer_end_time) + '</div><div class="ticket"><span class="orig-price">' + money(item.original_price) +
+    '</span><span class="rescue-price">' + money(item.rescue_price) +
+    '</span></div><button class="reserve-btn" onclick="openListingDetails(' + item.id + ')">View details</button></div></div>';
+  el('listing-grid').innerHTML = visible.length ? visible.map(card).join('')
+    : '<div class="empty-history">No listings match your search.</div>';
+  el('home-featured-grid').innerHTML = listings.slice(0,3).map(card).join('');
+  el('business-listings').innerHTML = businessListings.length ? businessListings.map(item =>
+    '<article class="manage-item">' + itemThumbnail(item) + '<div class="manage-item-content">' +
+      '<div class="manage-item-heading"><div><h4>' + escapeHtml(item.title) + '</h4><span>' +
+      escapeHtml(item.category) + '</span></div><span class="badge ' +
+      (item.daily_status==='Active'?'active':item.daily_status==='Sold Out'?'sold':'low') + '">' +
+      escapeHtml(item.daily_status) + '</span></div>' +
+      '<p>Original price: <strong>' + money(item.original_price) + '</strong> · Rescue price: <strong>' +
+      money(item.rescue_price) + '</strong></p><p>Daily offer: <strong>' +
+      offerTime(item.offer_start_time) + ' – ' + offerTime(item.offer_end_time) + '</strong> (Bangladesh time)</p>' +
+      (item.offer_date ? '<p>Offer date: <strong>' + escapeHtml(item.offer_date) + '</strong></p>' : '') +
+      '<p>Today made available: <strong>' + (item.initial_quantity ?? 'Not entered') +
+      '</strong> · Remaining: <strong>' + (item.remaining_quantity ?? '—') + '</strong></p>' +
+      '<div class="manage-item-actions"><label for="daily-qty-' + item.id + '">Today\'s total quantity</label>' +
+      '<input id="daily-qty-' + item.id + '" type="number" min="0" step="1" value="' +
+      (item.initial_quantity ?? '') + '" placeholder="Enter quantity">' +
+      '<button id="daily-save-' + item.id + '" class="btn-pri" onclick="submitDailyQuantity(' +
+      item.id + ')">Update Today\'s Quantity</button></div>' +
+      '<div class="manage-item-links"><button class="review-order-btn" onclick="openEditListingModal(' +
+      item.id + ')">Edit Item</button><button class="review-order-btn danger-action" onclick="deleteListing(' +
+      item.id + ')">Deactivate</button></div></div></article>').join('')
+    : '<div class="empty-history">No food items yet. Add one to start offering it each day.</div>';
+}
+function filterListings() { renderListings(); }
+function filterCategory(category, element) {
+  activeCategory = category;
+  document.querySelectorAll('.chip').forEach(item => item.classList.remove('on'));
+  element.classList.add('on'); renderListings();
+}
+function clearListingFilters() {
+  el('food-search').value = '';
+  el('loc-search').value = '';
+  activeCategory = 'All';
+  document.querySelectorAll('.chip-row .chip').forEach(item => item.classList.remove('on'));
+  document.querySelector('.chip-row .chip').classList.add('on');
+  renderListings();
+}
+function openListingDetails(id) {
+  const item = listings.find(row => row.id === id);
+  if (!item) return;
+  el('detail-title').textContent = item.title;
+  el('detail-body').innerHTML = (item.image_path ? '<img class="detail-food-image" src="' +
+    escapeHtml(imageUrl(item.image_path)) + '" alt="' + escapeHtml(item.title) + '">' : '') +
+    '<p>' + escapeHtml(item.description || 'Surplus food available for pickup.') +
+    '</p><p><strong>Business:</strong> ' + escapeHtml(item.business_name) +
+    '<br><strong>Pickup:</strong> ' + escapeHtml(item.pickup_address || 'Contact business for pickup details') +
+    '<br><strong>City:</strong> ' + escapeHtml(item.city || 'Not specified') +
+    '<br><strong>Daily offer:</strong> ' + offerTime(item.offer_start_time) + ' – ' +
+    offerTime(item.offer_end_time) + ' (Bangladesh time)' +
+    '<br><strong>Quantity:</strong> ' + item.quantity +
+    '<br><strong>Rescue price:</strong> ' + money(item.rescue_price) + '</p>';
+  el('detail-reserve').onclick = () => { addToCart(id); closeModal('listing-detail-modal'); };
+  el('listing-detail-modal').classList.add('active');
+}
+function addToCart(id) {
+  if (!currentUser || currentUser.role !== 'customer') return showScreen('login');
+  const item = listings.find(row => row.id === id);
+  if (!item) return;
+  const reserved = cartItems.filter(row => row.listing_id === id).length;
+  if (reserved >= item.quantity) return alert('No more units are available.');
+  cartItems.push({ listing_id:id,title:item.title,price:Number(item.rescue_price) });
+  renderTopNav();
+}
+function openCheckoutModal() {
+  if (!cartItems.length) return alert('Your cart is empty.');
+  el('checkout-summary').innerHTML = cartItems.map(item => '<div>' + escapeHtml(item.title) + ' · ' +
+    money(item.price) + '</div>').join('') + '<strong>Total: ' +
+    money(cartItems.reduce((sum,item)=>sum+item.price,0)) + '</strong>';
+  el('checkout-modal').classList.add('active');
+}
+async function confirmOrder() {
+  const counts = new Map();
+  cartItems.forEach(item => counts.set(item.listing_id,(counts.get(item.listing_id)||0)+1));
+  try {
+    await requestJson('/orders', { method:'POST', body:JSON.stringify({
+      items:[...counts].map(([listing_id,quantity])=>({ listing_id,quantity })),
+      payment_method:el('pay-method').value
+    }) });
+    cartItems=[]; closeModal('checkout-modal'); renderTopNav();
+    orders=await requestJson('/orders'); await loadInitialData(); renderProfile();
+    alert('Reservation placed. Track its status in your profile.');
+  } catch(error) { alert(error.message); }
+}
+async function changeOrder(id,status) {
+  try {
+    await requestJson('/orders/' + id, { method:'PATCH',body:JSON.stringify({ status }) });
+    if (currentUser.role === 'business') await loadBusiness();
+    else { orders=await requestJson('/orders'); renderProfile(); }
+    await loadInitialData();
+  } catch(error) { alert(error.message); }
+}
+function renderBusinessOrders() {
+  el('business-orders').innerHTML = businessOrders.length ? businessOrders.map(order => {
+    const next = ({ pending:'confirmed',confirmed:'ready',ready:'completed' })[order.status];
+    return '<div class="order-row"><strong>#' + order.id + ' · ' + escapeHtml(order.listing_title) +
+      '</strong><span>' + order.quantity + ' units · ' + money(order.total_price) +
+      '</span><span>' + escapeHtml(order.status) + '</span>' + (next
+        ? '<button class="review-order-btn" onclick="changeOrder(' + order.id + ',\'' + next +
+          '\')">Mark ' + next + '</button>' : '') + '</div>';
+  }).join('') : '<div class="empty-history">No reservations yet.</div>';
+}
+function switchBizTab(name, element) {
+  document.querySelectorAll('.sidebar .navitem').forEach(item => item.classList.remove('on'));
+  element.classList.add('on');
+  ['overview','orders','analytics','reviews','profile'].forEach(tab => {
+    el('biz-tab-' + tab).style.display = tab === name || (name === 'listings' && tab === 'overview') ? 'block' : 'none';
   });
+  if (name === 'profile') renderProfile();
+  if (name === 'listings') loadBusiness();
+}
+function openNewListingModal() {
+  editingListingId=null;
+  ['m-title','m-description','m-orig-price','m-rescue-price','m-image'].forEach(id=>el(id).value='');
+  el('m-category').value='Bakery';
+  el('m-start').value='20:00'; el('m-end').value='00:00';
+  el('listing-modal-title').textContent='Add Food Item';
+  el('listing-submit-btn').textContent='Save Food Item';
+  setFoodImagePreview(null);
+  el('listing-feedback').hidden=true;
+  el('new-listing-modal').classList.add('active');
+}
+function openEditListingModal(id) {
+  const item=businessListings.find(row=>row.id===id);
+  if (!item) return;
+  editingListingId=id;
+  el('m-title').value=item.title; el('m-category').value=item.category;
+  el('m-description').value=item.description||'';
+  el('m-orig-price').value=item.original_price; el('m-rescue-price').value=item.rescue_price;
+  el('m-start').value=item.offer_start_time?.slice(0,5)||'';
+  el('m-end').value=item.offer_end_time?.slice(0,5)||'';
+  el('m-image').value='';
+  setFoodImagePreview(item.image_path ? imageUrl(item.image_path) : null);
+  el('listing-modal-title').textContent='Edit Food Item';
+  el('listing-submit-btn').textContent='Save Item Changes';
+  el('listing-feedback').hidden=true;
+  el('new-listing-modal').classList.add('active');
+}
+function setFoodImagePreview(src) {
+  if (listingPreviewUrl) URL.revokeObjectURL(listingPreviewUrl);
+  listingPreviewUrl=null;
+  el('m-image-preview').hidden=!src;
+  el('m-image-preview').src=src||'';
+}
+function previewFoodImage() {
+  const file=el('m-image').files[0];
+  if (!file) {
+    const existing=businessListings.find(item=>item.id===editingListingId);
+    return setFoodImagePreview(existing?.image_path ? imageUrl(existing.image_path) : null);
+  }
+  if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>5*1024*1024) {
+    el('listing-feedback').textContent='Choose a JPG, PNG, or WebP image of 5 MB or less.';
+    el('listing-feedback').hidden=false;
+    el('m-image').value='';
+    return;
+  }
+  setFoodImagePreview(null);
+  listingPreviewUrl=URL.createObjectURL(file);
+  el('m-image-preview').src=listingPreviewUrl;
+  el('m-image-preview').hidden=false;
+  el('listing-feedback').hidden=true;
+}
+async function submitNewListing() {
+  const errorBox=el('listing-feedback');
+  const showError=message=>{ errorBox.textContent=message; errorBox.hidden=false; };
+  errorBox.hidden=true;
+  const title=el('m-title').value.trim();
+  const original=Number(el('m-orig-price').value);
+  const rescue=Number(el('m-rescue-price').value);
+  if (!title || !el('m-orig-price').value || !el('m-rescue-price').value ||
+    !Number.isFinite(original) || original<0 || !Number.isFinite(rescue) || rescue<0 || rescue>original ||
+    !el('m-start').value || !el('m-end').value) {
+    return showError('Enter a title, valid prices, and daily offer start/end times. Rescue price cannot exceed original price.');
+  }
+  const payload=new FormData();
+  Object.entries({ title,category:el('m-category').value,description:el('m-description').value,
+    original_price:original,rescue_price:rescue,offer_start_time:el('m-start').value,
+    offer_end_time:el('m-end').value }).forEach(([key,value])=>payload.append(key,value));
+  if (el('m-image').files[0]) payload.append('image',el('m-image').files[0]);
+  const button=el('listing-submit-btn');
+  button.disabled=true;
+  button.textContent='Saving…';
+  try {
+    await requestJson('/listings' + (editingListingId ? '/' + editingListingId : ''), {
+      method:editingListingId?'PUT':'POST',body:payload
+    });
+    const message=editingListingId ? 'Food item updated.' :
+      'Food item saved. Enter today\'s quantity below to make it available during its offer window.';
+    closeModal('new-listing-modal');
+    await loadInitialData(); await loadBusiness();
+    switchBizTab('listings', document.querySelector('[data-biz-tab="listings"]'));
+    el('business-feedback').textContent=message;
+    el('business-feedback').hidden=false;
+  } catch(error) { showError(error.message); }
+  finally {
+    button.disabled=false;
+    button.textContent=editingListingId ? 'Save Item Changes' : 'Save Food Item';
+  }
+}
+async function submitDailyQuantity(id) {
+  const input=el('daily-qty-'+id);
+  const value=Number(input.value);
+  if (input.value==='' || !Number.isSafeInteger(value) || value<0) {
+    el('business-feedback').textContent='Enter a non-negative whole-number quantity.';
+    el('business-feedback').hidden=false;
+    return;
+  }
+  const button=el('daily-save-'+id);
+  button.disabled=true; button.textContent='Saving…';
+  try {
+    await requestJson('/listings/'+id+'/today',{
+      method:'PUT',body:JSON.stringify({ initial_quantity:value })
+    });
+    await loadBusiness(); await fetchListings();
+    el('business-feedback').textContent='Today\'s quantity updated.';
+    el('business-feedback').hidden=false;
+  } catch(error) {
+    el('business-feedback').textContent=error.message;
+    el('business-feedback').hidden=false;
+    button.disabled=false; button.textContent='Update Today\'s Quantity';
+  }
+}
+async function deleteListing(id) {
+  if (!confirm('Deactivate this food item? Its order and daily history will remain.')) return;
+  try { await requestJson('/listings/' + id,{ method:'DELETE' }); await loadInitialData(); await loadBusiness(); }
+  catch(error) { alert(error.message); }
+}
+function closeModal(id) {
+  el(id).classList.remove('active');
+  if (id==='new-listing-modal' && listingPreviewUrl) {
+    URL.revokeObjectURL(listingPreviewUrl); listingPreviewUrl=null;
+  }
 }
 
 function renderReviews() {
-  const container = document.getElementById('reviews-feed');
-  const currentBizName = currentUser && currentUser.role === 'business' ? currentUser.name : 'Spice Trail Kitchen';
-
-  const filtered = reviewsDatabase.filter(r => r.biz.toLowerCase() === currentBizName.toLowerCase());
-
-  if (filtered.length > 0) {
-    const avgScore = (filtered.reduce((sum, r) => sum + r.rating, 0) / filtered.length).toFixed(1);
-    document.getElementById('biz-avg-rating').innerText = `${avgScore} ★`;
-    document.getElementById('review-summary-tag').innerText = `Total Reviews: ${filtered.length} | Avg Rating: ${avgScore} / 5.0`;
-  } else {
-    document.getElementById('biz-avg-rating').innerText = 'N/A';
-    document.getElementById('review-summary-tag').innerText = 'No reviews received yet.';
-  }
-
-  if (filtered.length === 0) {
-    container.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--ink-soft); font-size: 13px;">No customer reviews posted yet for ${currentBizName}.</div>`;
-    return;
-  }
-
-  container.innerHTML = '';
-  filtered.forEach(rev => {
-    let stars = '★'.repeat(rev.rating) + '☆'.repeat(5 - rev.rating);
-
-    let replyHtml = '';
-    if (rev.reply) {
-      replyHtml = `
-        <div class="review-reply">
-          <div class="review-reply-title">Owner Response</div>
-          <div>${rev.reply}</div>
-        </div>
-      `;
-    } else {
-      replyHtml = `
-        <div class="reply-input-box">
-          <input type="text" id="reply-input-${rev.id}" placeholder="Write a polite public response...">
-          <button onclick="submitReviewReply(${rev.id})">Reply</button>
-        </div>
-      `;
-    }
-
-    container.innerHTML += `
-      <div class="review-item">
-        <div class="review-header">
-          <div class="review-author">${rev.author} <span class="review-time">• ${rev.time}</span></div>
-          <div class="review-stars">${stars} (${rev.rating}.0)</div>
-        </div>
-        <div class="review-item-name">Meal Rescued: ${rev.item}</div>
-        <div class="review-comment">"${rev.comment}"</div>
-        <div class="review-actions"><button class="review-order-btn" onclick="openEditReviewModal(${rev.id})">Edit</button><button class="review-order-btn danger-action" onclick="deleteReview(${rev.id})">Delete</button></div>
-        ${replyHtml}
-      </div>
-    `;
-  });
+  const name=profile?.business_name;
+  const own=reviews.filter(review=>review.business_id===currentUser?.id && currentUser?.role==='business');
+  const avg=own.length ? (own.reduce((sum,review)=>sum+Number(review.rating),0)/own.length).toFixed(1) : 'N/A';
+  el('biz-avg-rating').textContent=avg==='N/A'?avg:avg+' ★';
+  el('review-summary-tag').textContent=own.length+' reviews';
+  el('reviews-feed').innerHTML=own.length ? own.map(review =>
+    '<div class="review-item"><strong>' + escapeHtml(review.author_name) + '</strong> · ' +
+    Number(review.rating) + ' ★<p>' + escapeHtml(review.comment) + '</p><small>' +
+    escapeHtml(review.item_name) + '</small>' + (review.reply
+      ? '<div class="review-reply">' + escapeHtml(review.reply) + '</div>'
+      : '<div class="reply-input-box"><input id="reply-input-' + review.id +
+        '" placeholder="Public reply"><button onclick="submitReviewReply(' + review.id +
+        ')">Reply</button></div>') + '</div>').join('')
+    : '<div class="empty-history">No reviews yet.</div>';
 }
-
-async function submitReviewReply(reviewId) {
-  const input = document.getElementById(`reply-input-${reviewId}`);
-  if (!input || !input.value.trim()) return;
-
-  const rev = reviewsDatabase.find(r => r.id === reviewId);
-  if (!rev) return;
-
+function renderHomeReviews() {
+  const publicReviews=reviews.slice(0,6);
+  el('home-reviews-carousel').innerHTML=publicReviews.length
+    ? publicReviews.map((review,index)=>'<article class="home-review-slide ' +
+      (index===0?'active':'') + '"><div class="home-review-stars">' +
+      '★'.repeat(Number(review.rating)) + '</div><blockquote>“' +
+      escapeHtml(review.comment) + '”</blockquote><div class="home-review-author"><strong>' +
+      escapeHtml(review.author_name) + '</strong><span>' + escapeHtml(review.business_name) +
+      '</span></div></article>').join('')
+    : '<div class="empty-history">No reviews yet.</div>';
+  el('review-carousel-dots').innerHTML=publicReviews.map((_,index)=>
+    '<button aria-label="Show review ' + (index+1) + '" onclick="showReviewSlide(' + index + ')"></button>').join('');
+  if (carouselTimer) clearInterval(carouselTimer);
+  if (publicReviews.length>1) carouselTimer=setInterval(()=>{
+    const slides=[...document.querySelectorAll('.home-review-slide')];
+    const active=slides.findIndex(slide=>slide.classList.contains('active'));
+    showReviewSlide((active+1)%slides.length);
+  },5000);
+}
+function showReviewSlide(index) {
+  document.querySelectorAll('.home-review-slide').forEach((slide,i)=>slide.classList.toggle('active',i===index));
+  document.querySelectorAll('#review-carousel-dots button').forEach((dot,i)=>dot.classList.toggle('active',i===index));
+}
+async function submitReviewReply(id) {
   try {
-    const data = await requestJson(`${API_BASE}/reviews/${reviewId}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        business_name: rev.biz,
-        item_name: rev.item,
-        author_name: rev.author,
-        rating: rev.rating,
-        comment: rev.comment,
-        reply: input.value.trim()
-      })
-    });
-    rev.reply = data.review.reply;
-    renderReviews();
-    renderHomeReviews();
-  } catch (error) {
-    alert(error.message);
-  }
+    await requestJson('/reviews/' + id + '/reply',{ method:'PATCH',
+      body:JSON.stringify({ reply:el('reply-input-' + id).value }) });
+    reviews=await requestJson('/reviews'); renderReviews(); renderHomeReviews();
+  } catch(error) { alert(error.message); }
 }
-
 function openReviewModal(orderId) {
-  editingReviewId = null;
-  selectedReviewOrder = orderHistory.find(order => order.id === orderId) || null;
-  const context = document.getElementById('review-order-context');
-  if (selectedReviewOrder) {
-    const firstItem = selectedReviewOrder.items[0];
-    const businessName = firstItem.biz.replace(/ · Local$/, '');
-    const businessSelect = document.getElementById('rev-biz');
-    if (![...businessSelect.options].some(option => option.value === businessName)) {
-      businessSelect.add(new Option(businessName, businessName));
-    }
-    businessSelect.value = businessName;
-    document.getElementById('rev-item').value = firstItem.title;
-    context.innerText = `Reviewing order #${selectedReviewOrder.id}`;
-  } else {
-    context.innerText = '';
-  }
-  document.getElementById('review-modal').classList.add('active');
+  selectedReviewOrder=orders.find(order=>order.id===orderId);
+  if (!selectedReviewOrder || selectedReviewOrder.status!=='completed') return;
+  const existing=reviews.find(review=>review.order_id===orderId);
+  editingReviewId=existing?.id||null;
+  el('review-order-context').textContent=selectedReviewOrder.listing_title +
+    ' from ' + selectedReviewOrder.business_name;
+  el('rev-rating').value=existing?.rating||5;
+  el('rev-comment').value=existing?.comment||'';
+  el('review-modal').classList.add('active');
 }
-
 async function submitCustomerReview() {
-  const biz = document.getElementById('rev-biz').value;
-  const item = document.getElementById('rev-item').value.trim();
-  const rating = parseInt(document.getElementById('rev-rating').value, 10);
-  const comment = document.getElementById('rev-comment').value.trim();
-
-  if (!item || !comment) {
-    alert('Please fill in both the meal title and review details.');
-    return;
-  }
-
-  const isEditing = Boolean(editingReviewId);
+  if (!selectedReviewOrder) return;
   try {
-    const payload = {
-      business_name: biz,
-      item_name: item,
-      author_name: currentUser ? currentUser.name : 'Verified Customer',
-      rating,
-      comment
-    };
-    const data = editingReviewId
-      ? await requestJson(`${API_BASE}/reviews/${editingReviewId}`, { method: 'PUT', body: JSON.stringify(payload) })
-      : await requestJson(`${API_BASE}/reviews`, { method: 'POST', body: JSON.stringify(payload) });
-    const review = data.review;
-    const mappedReview = {
-      id: review.id,
-      biz: review.business_name,
-      author: review.author_name || 'Verified Customer',
-      rating: Number(review.rating),
-      time: 'Just now',
-      item: review.item_name,
-      comment: review.comment,
-      reply: review.reply || null
-    };
-    const existingIndex = reviewsDatabase.findIndex(reviewItem => reviewItem.id === mappedReview.id);
-    if (existingIndex >= 0) reviewsDatabase.splice(existingIndex, 1, mappedReview);
-    else reviewsDatabase.unshift(mappedReview);
-    editingReviewId = null;
-    alert(isEditing ? 'Review updated.' : 'Thank you! Your feedback has been submitted to the restaurant.');
-  } catch (error) {
-    alert(error.message);
-    return;
-  }
-
-  document.getElementById('rev-item').value = '';
-  document.getElementById('rev-comment').value = '';
-  document.getElementById('rev-rating').value = '5';
-  closeModal('review-modal');
-
-  renderReviews();
-  renderHomeReviews();
-  selectedReviewOrder = null;
+    await requestJson('/reviews' + (editingReviewId?'/'+editingReviewId:''),{
+      method:editingReviewId?'PUT':'POST',
+      body:JSON.stringify({ order_id:selectedReviewOrder.id,rating:Number(el('rev-rating').value),
+        comment:el('rev-comment').value })
+    });
+    closeModal('review-modal'); reviews=await requestJson('/reviews');
+    renderProfile(); renderHomeReviews();
+  } catch(error) { alert(error.message); }
 }
-
-function switchBizTab(tabName, el) {
-  document.querySelectorAll('.sidebar .navitem').forEach(n => n.classList.remove('on'));
-  if (el) el.classList.add('on');
-
-  if (tabName === 'reviews') {
-    document.getElementById('biz-tab-overview').style.display = 'none';
-    document.getElementById('biz-tab-reviews').style.display = 'block';
-    renderReviews();
-  } else {
-    document.getElementById('biz-tab-overview').style.display = 'block';
-    document.getElementById('biz-tab-reviews').style.display = 'none';
-  }
-}
-
-function addToCart(id) {
-  const item = listings.find(l => l.id === id);
-  if (item && item.qty > 0) {
-    item.qty--;
-    cartItems.push({ title: item.title, biz: item.biz, price: item.rescue });
-    cartCount++;
-    const countEl = document.getElementById('cart-count');
-    if (countEl) countEl.innerText = cartCount;
-    renderListings();
-  } else {
-    alert('Sorry, this surplus item is sold out!');
-  }
-}
-
-function filterCategory(cat, el) {
-  activeCategory = cat;
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
-  el.classList.add('on');
-  renderListings();
-}
-
-function filterListings() {
-  renderListings();
-}
-
-function toggleView(view, btn) {
-  document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-
-  if (view === 'map') {
-    document.getElementById('map-view').style.display = 'block';
-    document.getElementById('listing-grid').style.display = 'none';
-  } else {
-    document.getElementById('map-view').style.display = 'none';
-    document.getElementById('listing-grid').style.display = 'grid';
-  }
-}
-
-function showScreen(screenId) {
-  if (screenId === 'profile' && !currentUser) {
-    screenId = 'login';
-  }
-
-  if (screenId === 'business' && (!currentUser || currentUser.role !== 'business')) {
-    screenId = 'customer';
-  }
-
-  activeScreen = screenId;
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(screenId).classList.add('active');
-  localStorage.setItem('plateup_screen', screenId);
-
-  renderTopNav();
-  if (screenId === 'business') {
-    renderReviews();
-  }
-  if (screenId === 'profile') {
-    renderProfile();
-  }
-}
-
-function openNewListingModal() {
-  editingListingId = null;
-  document.getElementById('listing-modal-title').innerText = 'Create Surplus Listing';
-  document.getElementById('listing-submit-btn').innerText = 'Publish Listing';
-  document.getElementById('m-title').value = '';
-  document.getElementById('m-qty').value = '1';
-  document.getElementById('m-orig-price').value = '';
-  document.getElementById('m-rescue-price').value = '';
-  document.getElementById('new-listing-modal').classList.add('active');
-}
-
-function openEditListingModal(id) {
-  const item = listings.find(listing => listing.id === id);
-  if (!item) return;
-  editingListingId = id;
-  document.getElementById('listing-modal-title').innerText = 'Edit Surplus Listing';
-  document.getElementById('listing-submit-btn').innerText = 'Save Changes';
-  document.getElementById('m-title').value = item.title;
-  document.getElementById('m-category').value = item.category;
-  document.getElementById('m-qty').value = item.qty;
-  document.getElementById('m-orig-price').value = item.orig;
-  document.getElementById('m-rescue-price').value = item.rescue;
-  document.getElementById('new-listing-modal').classList.add('active');
-}
-
-async function deleteListing(id) {
-  const item = listings.find(listing => listing.id === id);
-  if (!item || !confirm(`Delete "${item.title}"?`)) return;
-
-  try {
-    await requestJson(`${API_BASE}/listings/${id}`, { method: 'DELETE' });
-    const index = listings.findIndex(listing => listing.id === id);
-    if (index >= 0) listings.splice(index, 1);
-    renderListings();
-  } catch (error) {
-    alert(error.message);
-  }
-}
-
-function openCheckoutModal() {
-  if (cartCount === 0) {
-    alert('Your rescue cart is empty!');
-    return;
-  }
-  document.getElementById('checkout-summary').innerHTML = `<b>Total Reserved Items:</b> ${cartCount} items`;
-  document.getElementById('checkout-modal').classList.add('active');
-}
-
-function closeModal(id) {
-  document.getElementById(id).classList.remove('active');
-}
-
-async function submitNewListing() {
-  const title = document.getElementById('m-title').value.trim();
-  const category = document.getElementById('m-category').value;
-  const qty = parseInt(document.getElementById('m-qty').value, 10);
-  const orig = Number(document.getElementById('m-orig-price').value);
-  const rescue = Number(document.getElementById('m-rescue-price').value);
-
-  if (!title || !Number.isInteger(qty) || qty < 1 || !Number.isFinite(orig) || orig < 0 || !Number.isFinite(rescue) || rescue < 0 || rescue > orig) {
-    alert('Enter a title, a positive quantity, and valid prices. Rescue price cannot exceed original price.');
-    return;
-  }
-
-  try {
-    const payload = {
-      title,
-      category,
-      business_name: currentUser ? currentUser.name : 'Spice Trail Kitchen',
-      original_price: orig,
-      rescue_price: rescue,
-      quantity: qty
-    };
-    const data = editingListingId
-      ? await requestJson(`${API_BASE}/listings/${editingListingId}`, { method: 'PUT', body: JSON.stringify(payload) })
-      : await requestJson(`${API_BASE}/listings`, { method: 'POST', body: JSON.stringify(payload) });
-    const item = data.listing;
-    const mappedItem = {
-      id: item.id,
-      title: item.title,
-      category: item.category,
-      biz: `${item.business_name} · Local`,
-      orig: Number(item.original_price),
-      rescue: Number(item.rescue_price),
-      qty: Number(item.quantity),
-      discount: `-${Math.round((1 - (Number(item.rescue_price) / (Number(item.original_price) || 1))) * 100)}%`,
-      time: 'Ends in 3h',
-      aiRecommended: false
-    };
-    const existingIndex = listings.findIndex(listing => listing.id === mappedItem.id);
-    if (existingIndex >= 0) listings.splice(existingIndex, 1, mappedItem);
-    else listings.unshift(mappedItem);
-    editingListingId = null;
-    renderListings();
-    closeModal('new-listing-modal');
-  } catch (error) {
-    alert(error.message);
-  }
-}
-
-function openEditReviewModal(id) {
-  const review = reviewsDatabase.find(reviewItem => reviewItem.id === id);
-  if (!review) return;
-  editingReviewId = id;
-  document.getElementById('rev-biz').value = review.biz;
-  document.getElementById('rev-item').value = review.item;
-  document.getElementById('rev-rating').value = review.rating;
-  document.getElementById('rev-comment').value = review.comment;
-  document.getElementById('review-order-context').innerText = 'Editing your review';
-  document.getElementById('review-modal').classList.add('active');
-}
-
 async function deleteReview(id) {
-  if (!confirm('Delete this review?')) return;
+  if (!confirm('Delete your review?')) return;
   try {
-    await requestJson(`${API_BASE}/reviews/${id}`, { method: 'DELETE' });
-    const index = reviewsDatabase.findIndex(review => review.id === id);
-    if (index >= 0) reviewsDatabase.splice(index, 1);
-    renderReviews();
-    renderHomeReviews();
-  } catch (error) {
-    alert(error.message);
-  }
+    await requestJson('/reviews/' + id, { method:'DELETE' });
+    reviews=await requestJson('/reviews'); renderProfile(); renderHomeReviews();
+  } catch(error) { alert(error.message); }
 }
 
-function confirmOrder() {
-  if (cartItems.length === 0) return;
-
-  orderHistory.unshift({
-    id: `PU-${Date.now().toString().slice(-6)}`,
-    date: new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
-    items: cartItems,
-    total: cartItems.reduce((total, item) => total + item.price, 0)
-  });
-  saveOrderHistory();
-  alert('Order placed successfully! Please check your order pickup time window.');
-  cartCount = 0;
-  cartItems = [];
-  const countEl = document.getElementById('cart-count');
-  if (countEl) countEl.innerText = 0;
-  closeModal('checkout-modal');
-}
-
-restoreSession();
 renderTopNav();
-const savedScreen = localStorage.getItem('plateup_screen');
-if (savedScreen && document.getElementById(savedScreen)) {
-  showScreen(savedScreen);
-}
 loadInitialData();
+loadAccount().then(()=>{
+  const savedScreen = localStorage.getItem('plateup_screen') || 'home';
+  const target = currentUser || ['home','customer','login'].includes(savedScreen) ? savedScreen : 'home';
+  showScreen(target);
+});
+function refreshVisibleData() {
+  if (document.visibilityState==='hidden') return;
+  if (activeScreen==='home' || activeScreen==='customer') refreshMarketplace();
+  if (activeScreen==='business') refreshBusinessListings();
+}
+window.addEventListener('focus',refreshVisibleData);
+setInterval(refreshVisibleData,30000);

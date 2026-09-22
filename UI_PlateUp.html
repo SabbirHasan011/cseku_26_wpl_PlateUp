@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PlateUp — AI-Powered Surplus Food Marketplace</title>
+<title>PlateUp — Surplus Food Marketplace</title>
 <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
   <div class="topbar">
     <div class="logo" onclick="showScreen('home')">
       <div class="logo-mark">PlateUp</div>
-      <div class="logo-tag">AI-Powered Surplus Marketplace</div>
+      <div class="logo-tag">Surplus Food Marketplace</div>
     </div>
     <div class="top-controls" id="nav-controls">
       <!-- Dynamic Navigation Rendered via JavaScript -->
@@ -26,26 +26,10 @@
     
     <div class="home-hero">
       <h1>Rescue Fresh Food,<br>Cut Waste, Save Up to 70%</h1>
-      <p>PlateUp connects local restaurants, bakeries, and grocery stores with nearby customers to sell unsold surplus meals at deep discounts using AI-driven pricing.</p>
+      <p>PlateUp connects local restaurants, bakeries, and grocery stores with nearby customers to offer surplus food at discounted pickup prices.</p>
       <div class="cta-group">
         <button class="btn-hero-pri" onclick="showScreen('customer')">Browse Surplus Deals</button>
         <button class="btn-hero-sec" onclick="showScreen('login')">Partner as a Business</button>
-      </div>
-    </div>
-
-    <!-- Live Impact Metric Strip -->
-    <div class="impact-strip">
-      <div class="impact-box">
-        <div class="impact-num">14,820 kg</div>
-        <div class="impact-label">Food Rescued To Date</div>
-      </div>
-      <div class="impact-box">
-        <div class="impact-num">37.0 Tons</div>
-        <div class="impact-label">CO2 Emissions Prevented</div>
-      </div>
-      <div class="impact-box">
-        <div class="impact-num">৳2.4M+</div>
-        <div class="impact-label">Saved by Consumers</div>
       </div>
     </div>
 
@@ -53,18 +37,18 @@
     <div class="features-grid">
       <div class="feature-card">
         <span class="feature-icon">🤖</span>
-        <h3 class="feature-title">AI Dynamic Pricing</h3>
-        <p class="feature-desc">Our Machine Learning model dynamically predicts daily surplus and adjusts prices for 98% guaranteed sell-through.</p>
+        <h3 class="feature-title">Rescue Prices</h3>
+        <p class="feature-desc">Businesses set their own discounted prices for surplus meals.</p>
       </div>
       <div class="feature-card">
         <span class="feature-icon">📍</span>
-        <h3 class="feature-title">Hyper-Local Map</h3>
-        <p class="feature-desc">Discover surprise boxes and discounted gourmet meals within walking distance from top nearby venues.</p>
+        <h3 class="feature-title">Local Pickup</h3>
+        <p class="feature-desc">Browse nearby listings and collect reserved meals from the business.</p>
       </div>
       <div class="feature-card">
         <span class="feature-icon">⭐</span>
-        <h3 class="feature-title">Verified Reviews</h3>
-        <p class="feature-desc">Transparent feedback loop ensuring freshness, quality packaging, and fast pickup verification.</p>
+        <h3 class="feature-title">Order Reviews</h3>
+        <p class="feature-desc">Customers can review a meal after its pickup is completed.</p>
       </div>
     </div>
 
@@ -124,11 +108,11 @@
       <form id="form-login" class="auth-form active" onsubmit="handleLogin(event)">
         <div class="form-group">
           <label>Email Address</label>
-          <input type="email" id="login-email" value="user@plateup.com" required>
+          <input type="email" id="login-email" placeholder="name@example.com" required>
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input type="password" id="login-pass" value="password123" required>
+          <input type="password" id="login-pass" required>
         </div>
         <button type="submit" class="btn-submit">Sign In</button>
       </form>
@@ -166,11 +150,11 @@
       <h1>Good food, before it's gone.</h1>
       <p>Local restaurants list fresh surplus meals at fraction of original price. Order now and pick up before close.</p>
       <div class="search-row">
-        <input type="text" id="loc-search" placeholder="City / District" value="Dhanmondi, Dhaka">
+        <input type="text" id="loc-search" placeholder="City / District" onkeyup="filterListings()">
         <input type="text" id="food-search" placeholder="Search bakery, biryani, groceries..." onkeyup="filterListings()">
         <button onclick="filterListings()">Search</button>
       </div>
-      <div class="rescue-stat">This week your area rescued <b>1,240 kg</b> of food. CO2 impact reduction: <b>3.1 tons</b>.</div>
+      <div class="rescue-stat">Browse available food and reserve it for pickup.</div>
     </div>
 
     <div class="filter-bar">
@@ -178,22 +162,16 @@
         <div class="chip on" onclick="filterCategory('All', this)">All</div>
         <div class="chip" onclick="filterCategory('Bakery', this)">Bakery</div>
         <div class="chip" onclick="filterCategory('Restaurant meal', this)">Restaurant meal</div>
+        <div class="chip" onclick="filterCategory('Main Meal', this)">Main Meal</div>
         <div class="chip" onclick="filterCategory('Groceries', this)">Groceries</div>
         <div class="chip" onclick="filterCategory('Cafe', this)">Cafe</div>
         <div class="chip" onclick="filterCategory('Produce', this)">Produce</div>
       </div>
-      <div class="view-toggle">
-        <button class="active" onclick="toggleView('grid', this)">Grid View</button>
-        <button onclick="toggleView('map', this)">Map View</button>
+      <div class="marketplace-actions">
+        <span id="listing-status" role="status">Loading listings…</span>
+        <button id="clear-listing-filters" type="button" onclick="clearListingFilters()" hidden>Clear filters</button>
+        <button type="button" onclick="refreshMarketplace()">Refresh listings</button>
       </div>
-    </div>
-
-    <!-- Interactive Map Display -->
-    <div id="map-view" class="map-container">
-      <div class="map-bg">[ Interactive Map View - Food Rescue Pins ]</div>
-      <div class="map-pin" style="top:30%; left:40%;" onclick="alert('Aromas Bakery: 6 items left')">Aromas Bakery (৳180)</div>
-      <div class="map-pin" style="top:55%; left:60%;" onclick="alert('Spice Trail Kitchen: 3 items left')">Spice Trail Kitchen (৳140)</div>
-      <div class="map-pin" style="top:70%; left:30%;" onclick="alert('Green Basket: 2 crates left')">Green Basket (৳220)</div>
     </div>
 
     <!-- Listing Grid Container -->
@@ -237,13 +215,29 @@
       </section>
     </div>
 
+    <section class="profile-card">
+      <h2>Account details</h2>
+      <form id="profile-form" onsubmit="saveProfile(event)">
+        <div class="form-row">
+          <div class="form-group"><label>Name</label><input id="profile-edit-name" required></div>
+          <div class="form-group"><label>Phone</label><input id="profile-edit-phone"></div>
+        </div>
+        <div class="form-group"><label>Address</label><input id="profile-edit-address"></div>
+        <div class="form-row">
+          <div class="form-group"><label>City</label><input id="profile-edit-city"></div>
+          <div class="form-group"><label>Preferred location</label><input id="profile-edit-location"></div>
+        </div>
+        <button class="btn-pri" type="submit">Save profile</button>
+      </form>
+    </section>
+
     <section class="profile-card order-history-card">
       <div class="profile-section-heading">
         <div>
           <p class="profile-label">Activity</p>
           <h2>Order history</h2>
         </div>
-        <span class="profile-history-note">Saved to your account</span>
+        <span class="profile-history-note">Saved in PlateUp</span>
       </div>
       <div id="order-history" class="order-history">
         <div class="empty-history">Your completed reservations will appear here.</div>
@@ -264,58 +258,70 @@
           </div>
         </div>
         <div class="navitem on" onclick="switchBizTab('overview', this)">Overview</div>
-        <div class="navitem" onclick="switchBizTab('listings', this)">Manage Listings</div>
-        <div class="navitem" onclick="switchBizTab('analytics', this)">ML Analytics & Demand</div>
+        <div class="navitem" data-biz-tab="listings" onclick="switchBizTab('listings', this)">Manage Listings</div>
+        <div class="navitem" onclick="switchBizTab('orders', this)">Orders</div>
+        <div class="navitem" onclick="switchBizTab('analytics', this)">Sales & Predictions</div>
         <div class="navitem" onclick="switchBizTab('reviews', this)">Customer Reviews</div>
         <div class="navitem" onclick="switchBizTab('profile', this)">Business Profile</div>
-        <button class="newlist-btn" onclick="openNewListingModal()">+ New Listing</button>
+        <button class="newlist-btn" onclick="openNewListingModal()">+ Add Food Item</button>
       </div>
 
       <div>
+        <div id="business-feedback" class="form-success" role="status" hidden></div>
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-label">Active Listings</div><div class="stat-value">7</div></div>
-          <div class="stat-card"><div class="stat-label">Meals Rescued</div><div class="stat-value">34</div></div>
-          <div class="stat-card"><div class="stat-label">Today's Revenue</div><div class="stat-value">৳6,120</div></div>
-          <div class="stat-card"><div class="stat-label">Avg Rating</div><div class="stat-value" id="biz-avg-rating">4.7 ★</div></div>
+          <div class="stat-card"><div class="stat-label">Active Listings</div><div class="stat-value" id="biz-active-count">0</div></div>
+          <div class="stat-card"><div class="stat-label">Meals Rescued</div><div class="stat-value" id="biz-meals-count">0</div></div>
+          <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value" id="biz-revenue">৳0</div></div>
+          <div class="stat-card"><div class="stat-label">Avg Rating</div><div class="stat-value" id="biz-avg-rating">N/A</div></div>
         </div>
 
         <!-- Section View: Main Dashboard Overview -->
         <div id="biz-tab-overview">
-          <!-- Dynamic ML Demand Prediction Display -->
           <div class="ml-card">
             <div>
-              <div class="label">AI ML Demand & Surplus Prediction Engine</div>
-              <p class="headline">Tomorrow's surplus demand is trending HIGH (+35%)</p>
-              <div class="sub">Dynamic Pricing Engine recommends pricing surplus rice trays at <b>৳130</b> for optimal 98% sell-through rate.</div>
+              <div class="label">Predictions</div>
+              <p class="headline">No predictions yet</p>
+              <div class="sub">Demand and pricing models have not been developed.</div>
             </div>
-            <div class="ml-conf">92%<div style="font-family:var(--font-body);font-size:10px;font-weight:600;color:#AFCBB6;text-transform:uppercase;">Confidence Score</div></div>
           </div>
 
           <div class="panel">
-            <h3>Your Active Surplus Listings (FOOD_LISTINGS)</h3>
-            <table id="business-table">
-              <thead>
-                <tr><th>Item Title</th><th>Category</th><th>Qty Left</th><th>Rescue Price</th><th>Status</th><th>Actions</th></tr>
-              </thead>
-              <tbody>
-                <!-- Dynamic Table Content -->
-              </tbody>
-            </table>
+            <h3>Manage Food Items</h3>
+            <p class="profile-muted">Save each food item once. Enter its total quantity each day to offer it during its regular window. Times use Bangladesh time.</p>
+            <div id="business-listings" class="manage-listings"></div>
           </div>
 
-          <div class="panel">
-            <h3>Weekly Rescue Sales Trend</h3>
-            <div class="chart">
-              <div class="bar-col"><div class="bar-val">৳3.2k</div><div class="bar" style="height:52%"></div><div class="bar-day">Mon</div></div>
-              <div class="bar-col"><div class="bar-val">৳4.1k</div><div class="bar" style="height:66%"></div><div class="bar-day">Tue</div></div>
-              <div class="bar-col"><div class="bar-val">৳3.8k</div><div class="bar" style="height:61%"></div><div class="bar-day">Wed</div></div>
-              <div class="bar-col"><div class="bar-val">৳5.0k</div><div class="bar" style="height:80%"></div><div class="bar-day">Thu</div></div>
-              <div class="bar-col"><div class="bar-val">৳4.4k</div><div class="bar" style="height:70%"></div><div class="bar-day">Fri</div></div>
-              <div class="bar-col"><div class="bar-val">৳5.9k</div><div class="bar" style="height:95%"></div><div class="bar-day">Sat</div></div>
-              <div class="bar-col"><div class="bar-val">৳6.1k</div><div class="bar" style="height:98%"></div><div class="bar-day">Sun</div></div>
-            </div>
-          </div>
         </div>
+
+        <section id="biz-tab-orders" class="panel" style="display:none">
+          <h3>Customer reservations</h3>
+          <div id="business-orders" class="order-history"></div>
+        </section>
+        <section id="biz-tab-analytics" class="panel" style="display:none">
+          <h3>Completed sales</h3><div id="business-sales"></div>
+          <h3>ML predictions</h3><p id="business-predictions">No predictions yet.</p>
+        </section>
+        <section id="biz-tab-profile" class="panel" style="display:none">
+          <h3>Business profile</h3>
+          <form onsubmit="saveBusinessProfile(event)">
+            <div class="form-row">
+              <div class="form-group"><label>Business name</label><input id="business-profile-name" required></div>
+              <div class="form-group"><label>Phone</label><input id="business-profile-phone"></div>
+            </div>
+            <div class="form-group"><label>Description</label><textarea id="business-profile-description"></textarea></div>
+            <div class="form-group"><label>Pickup address</label><input id="business-profile-address"></div>
+            <div class="form-row">
+              <div class="form-group"><label>City</label><input id="business-profile-city"></div>
+              <div class="form-group"><label>Opening time</label><input id="business-profile-open" type="time"></div>
+              <div class="form-group"><label>Closing time</label><input id="business-profile-close" type="time"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Latitude</label><input id="business-profile-lat" type="number" step="any" min="-90" max="90"></div>
+              <div class="form-group"><label>Longitude</label><input id="business-profile-lon" type="number" step="any" min="-180" max="180"></div>
+            </div>
+            <button class="btn-pri" type="submit">Save business profile</button>
+          </form>
+        </section>
 
         <!-- Section View: Customer Reviews -->
         <div id="biz-tab-reviews" style="display: none;">
@@ -339,10 +345,10 @@
 
 </div>
 
-<!-- Modal: New Listing -->
+<!-- Modal: Add or edit a reusable food item -->
 <div class="modal-overlay" id="new-listing-modal">
   <div class="modal">
-    <h3 id="listing-modal-title">Create Surplus Listing</h3>
+    <h3 id="listing-modal-title">Add Food Item</h3>
     <div class="form-group">
       <label>Title</label>
       <input type="text" id="m-title" placeholder="e.g. Mixed Pastry surprise box">
@@ -350,32 +356,38 @@
     <div class="form-row">
       <div class="form-group">
         <label>Category</label>
-        <select id="m-category">
-          <option>Bakery</option>
-          <option>Restaurant meal</option>
-          <option>Groceries</option>
-          <option>Cafe</option>
-          <option>Produce</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Quantity</label>
-        <input type="number" id="m-qty" value="5">
+        <input id="m-category" list="food-categories" required>
+        <datalist id="food-categories">
+          <option value="Bakery"><option value="Restaurant meal"><option value="Main Meal">
+          <option value="Groceries"><option value="Cafe"><option value="Produce">
+        </datalist>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label>Original Price (৳)</label>
-        <input type="number" id="m-orig-price" placeholder="450">
+        <input type="number" id="m-orig-price" placeholder="450" min="0" step="0.01" required>
       </div>
       <div class="form-group">
         <label>Rescue Price (৳)</label>
-        <input type="number" id="m-rescue-price" placeholder="180">
+        <input type="number" id="m-rescue-price" placeholder="180" min="0" step="0.01" required>
       </div>
     </div>
+    <div class="form-group"><label>Description</label><textarea id="m-description" rows="2"></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>Daily offer starts (Bangladesh time)</label><input type="time" id="m-start" required></div>
+      <div class="form-group"><label>Daily offer ends (Bangladesh time)</label><input type="time" id="m-end" required></div>
+    </div>
+    <div class="form-group">
+      <label for="m-image">Food photo or poster (JPG, PNG, WebP; max 5 MB)</label>
+      <input type="file" id="m-image" accept="image/jpeg,image/png,image/webp" onchange="previewFoodImage()">
+      <img id="m-image-preview" class="item-image-preview" alt="Food item preview" hidden>
+    </div>
+    <p class="profile-muted">After saving, set today's quantity in Manage Listings. An earlier end time closes after midnight; matching start and end times mean a 24-hour offer.</p>
+    <div id="listing-feedback" class="form-error" role="alert" hidden></div>
     <div class="form-actions modal-actions">
       <button class="btn-sec" onclick="closeModal('new-listing-modal')">Cancel</button>
-      <button class="btn-pri" id="listing-submit-btn" onclick="submitNewListing()">Publish Listing</button>
+      <button class="btn-pri" id="listing-submit-btn" onclick="submitNewListing()">Save Food Item</button>
     </div>
   </div>
 </div>
@@ -385,19 +397,6 @@
   <div class="modal">
     <h3>Leave a Review</h3>
     <p id="review-order-context" class="review-order-context"></p>
-    <div class="form-group">
-      <label>Select Restaurant / Store</label>
-      <select id="rev-biz">
-        <option>Spice Trail Kitchen</option>
-        <option>Aromas Bakery</option>
-        <option>Green Basket Grocers</option>
-        <option>Cafe Cornerstone</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Rescued Meal Title</label>
-      <input type="text" id="rev-item" placeholder="e.g. Chicken biryani, end-of-day tray" required>
-    </div>
     <div class="form-group">
       <label>Rating</label>
       <select id="rev-rating">
@@ -419,6 +418,17 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="listing-detail-modal">
+  <div class="modal">
+    <h3 id="detail-title"></h3>
+    <div id="detail-body"></div>
+    <div class="modal-actions">
+      <button class="btn-sec" onclick="closeModal('listing-detail-modal')">Close</button>
+      <button class="btn-pri" id="detail-reserve">Reserve</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Checkout Order -->
 <div class="modal-overlay" id="checkout-modal">
   <div class="modal">
@@ -428,9 +438,7 @@
     <div class="form-group">
       <label>Payment Method</label>
       <select id="pay-method">
-        <option>bKash / Mobile Banking</option>
-        <option>Pay at Store Pickup</option>
-        <option>Credit/Debit Card</option>
+        <option>Pay at pickup</option>
       </select>
     </div>
     <div class="modal-actions">
@@ -440,7 +448,6 @@
   </div>
 </div>
 
-<script src="assets/js/data.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
 </html>

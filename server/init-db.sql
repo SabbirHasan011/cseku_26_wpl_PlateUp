@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 INSERT INTO users (name, email, password_hash, role)
 VALUES
-  ('Demo Customer', 'user@plateup.com', '$2b$10$8l1R6D4eA1JdQw2m3LrJ/Ok6i0o7QpZRL4nZsawMJeU0k5P79NH5m', 'customer'),
-  ('Spice Trail Kitchen', 'spicetrail@plateup.com', '$2b$10$8l1R6D4eA1JdQw2m3LrJ/Ok6i0o7QpZRL4nZsawMJeU0k5P79NH5m', 'business')
+  ('Demo Customer', 'user@plateup.com', '$2b$10$y/GmCC2pucaVEKAzfTu.CeUr1A926kLEa8y6c13/.75PYO9CngyKe', 'customer'),
+  ('Spice Trail Kitchen', 'spicetrail@plateup.com', '$2b$10$y/GmCC2pucaVEKAzfTu.CeUr1A926kLEa8y6c13/.75PYO9CngyKe', 'business')
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO listings (title, category, business_name, original_price, rescue_price, quantity)
