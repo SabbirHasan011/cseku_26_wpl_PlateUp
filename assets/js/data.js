@@ -1,8 +1,3 @@
-const fallbackUsersDatabase = [
-  { name: 'Demo Customer', email: 'user@plateup.com', pass: 'password123', role: 'customer' },
-  { name: 'Spice Trail Kitchen', email: 'spicetrail@plateup.com', pass: 'password123', role: 'business' }
-];
-
 const fallbackListings = [
   { id: 1, title: 'Mixed pastry surprise box', category: 'Bakery', biz: 'Aromas Bakery · Dhanmondi', orig: 450, rescue: 180, qty: 6, discount: '-60%', time: 'Ends in 1h 40m', aiRecommended: true },
   { id: 2, title: 'Chicken biryani, end-of-day tray', category: 'Restaurant meal', biz: 'Spice Trail Kitchen · Mohammadpur', orig: 320, rescue: 140, qty: 3, discount: '-56%', time: 'Ends in 2h 10m', aiRecommended: false },
@@ -45,12 +40,6 @@ const fallbackReviewsDatabase = [
   }
 ];
 
-window.plateupFallbackData = {
-  users: fallbackUsersDatabase,
-  listings: fallbackListings,
-  reviews: fallbackReviewsDatabase
-};
-
-const usersDatabase = [...fallbackUsersDatabase];
-const listings = [...fallbackListings];
-const reviewsDatabase = [...fallbackReviewsDatabase];
+// Archived prototype fixture data. The application loads listings and reviews
+// from PostgreSQL through the API; this file is not included by the page.
+window.plateupFallbackData = { listings: fallbackListings, reviews: fallbackReviewsDatabase };
