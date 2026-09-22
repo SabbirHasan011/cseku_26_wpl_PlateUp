@@ -1,35 +1,214 @@
 # PlateUp
 
-PlateUp is a pickup-based surplus food marketplace for customers and food businesses. Businesses publish discounted food; customers reserve it and collect it at the business.
+PlateUp is a surplus-food marketplace built to reduce food waste by helping businesses list food near the end of its selling period at discounted rescue prices, while allowing customers to discover, reserve, and collect discounted meals.
 
-## Current stack
+This project is a full-stack web application with a PostgreSQL-backed backend and a lightweight HTML/CSS/JavaScript frontend. It focuses on the core marketplace flow: signup, listing creation, inventory tracking, reservations, order management, reviews, and sales reporting.
 
-- Frontend: HTML, CSS, and vanilla JavaScript in `UI_PlateUp.html` and `assets/`. React and Tailwind are planned, but are not in this repository.
-- Backend: Node.js and Express.
-- Database: PostgreSQL.
-- Authentication: bcrypt password hashes and JWTs.
-- AI/ML: prediction storage exists; no model or generated predictions exist yet.
+## Why this project exists
 
-## Setup
+Food businesses often have usable food left near closing time. Instead of letting it go to waste, PlateUp lets them publish it as a discounted listing and gives customers the ability to reserve it before pickup.
 
-Install dependencies with `npm install`. Provide `DB_USER`, `DB_HOST`, `DB_NAME`, `DB_PASSWORD`, `DB_PORT` (optional), `JWT_SECRET`, and `PORT` (optional) in a local `.env`. Do not commit the file.
+The app is designed around a simple pickup-based marketplace model:
 
-Run `npm run db:migrate` before starting the app. This creates the initial schema on an empty database, or incrementally updates an existing PlateUp database without dropping its data. It can be rerun. Existing listing IDs stay intact for orders, reviews, and sales. Legacy listing stock is copied into dated availability once; older items without an offer window receive a full-day window and can be given a new daily quantity on later dates. Legacy listings/reviews with names that do not match a registered account are attached to inactive placeholder accounts; unmatched review item names remain available as legacy display text.
+1. A business creates a listing.
+2. A customer searches and reserves available food.
+3. The business updates order status.
+4. The customer picks up the order.
+5. Sales and review data are recorded.
 
-Run `npm start`, then visit `http://localhost:5000/`. Run `npm test` for the API integration test. There is no frontend build step because this frontend is plain HTML/JS.
+## Features
 
-## Implemented workflows
+### User roles and authentication
+- Customer and business signup/login
+- JWT-based session handling
+- Role-based access checks
+- Secure password hashing with bcrypt
+- Profile editing for both customers and businesses
 
-- Customer and business signup/login, account and role checks, profile editing.
-- Businesses save reusable food items with a fixed daily offer window and optional food image, then set each day's total quantity from Manage Listings. Images are stored under `server/uploads/food/`, served through `/uploads/food/`, limited to 5 MB, and excluded from Git.
-- Daily availability keeps separate initial and remaining quantities for each item and offer date. One record per item/date is enforced by the database. Offer windows and status use `Asia/Dhaka`; an end time earlier than or equal to the start time ends on the next date.
-- Public listing search, category filtering, image display, and details. Only active, in-window items with remaining stock are returned by the API.
-- Customer reservations stored as orders with an atomic daily-inventory update; customer cancellation restores stock to the same daily record. Quantity changes cannot go below units already reserved.
-- Business order progression from pending to confirmed, ready, and completed.
-- Sales history recorded when an order is completed.
-- Customer reviews of completed orders, review editing/deletion, and business replies.
-- Business sales summary and prediction empty state.
+### Business features
+- Create and manage food listings
+- Set original and rescue prices
+- Define offer start and end times
+- Upload food images
+- Manage daily availability and remaining stock
+- Track business orders from pending to completed
+- View sales summaries and business analytics
 
-The existing [SRS](PlateUp_SRS.pdf) and [AGENTS.md](AGENTS.md) describe the broader target system. Administrator tools, a React frontend, real mapping, and ML prediction/recommendation models remain future work.
+### Customer features
+- Search and browse active listings
+- Filter by category
+- View item details and pickup information
+- Reserve food based on daily availability
+- Cancel eligible orders
+- Leave reviews for completed orders
 
-The fixed rescue price remains an item field for existing checkout and sales behavior. No ML prediction or dynamic pricing is implemented. Before testing image uploads, restart `npm start` after installing the updated dependencies and running the migration. The current frontend is plain HTML/JavaScript, so there is no frontend build or lint command.
+### Inventory and order handling
+- Daily inventory records per listing and date
+- Atomic stock updates during reservation creation
+- Quantity validation to prevent over-ordering
+- Order status transitions such as pending, confirmed, ready, and completed
+- Sales history recording when an order is completed
+
+### Reviews
+- Customers can create, edit, and delete reviews for completed orders
+- Business owners can reply to reviews
+- Reviews are tied to real orders and listings
+
+## Tech stack
+
+### Current stack in this repository
+- Frontend: HTML, CSS, and vanilla JavaScript
+- Backend: Node.js + Express
+- Database: PostgreSQL
+- Authentication: bcrypt + JWT
+- File handling: multer
+- CORS: enabled for API access
+
+### Important note
+This repository does not currently use React or Tailwind. The frontend is a plain static web UI, and there is no frontend build step in the current setup.
+
+The AI/ML prediction features described in the broader project vision are not implemented yet in this codebase.
+
+## Project structure
+
+```text
+.
+├── assets/
+│   ├── css/
+│   └── js/
+├── server/
+│   ├── uploads/
+│   ├── db.js
+│   ├── index.js
+│   ├── init-db.sql
+│   ├── migrate.js
+│   └── migrate.sql
+├── test/
+│   └── api.test.js
+├── UI_PlateUp.html
+├── AGENTS.md
+├── README.md
+├── package.json
+└── PlateUp_SRS.pdf
+```
+
+## Prerequisites
+
+Before running the app, make sure you have:
+
+- Node.js installed
+- PostgreSQL running locally or on a server
+- A database created for PlateUp
+- A `.env` file with required environment variables
+
+## Environment variables
+
+Create a `.env` file in the project root with values similar to the following:
+
+```env
+DB_USER=your_db_user
+DB_HOST=localhost
+DB_NAME=plateup
+DB_PASSWORD=your_db_password
+DB_PORT=5432
+JWT_SECRET=your_secure_jwt_secret
+PORT=5000
+```
+
+Important:
+- Do not commit the `.env` file.
+- Keep secrets out of source control.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Database setup
+
+Run the migration script before starting the app:
+
+```bash
+npm run db:migrate
+```
+
+This script initializes the required schema and can be rerun safely to update the database without dropping existing data when applicable.
+
+## Running the app
+
+Start the server:
+
+```bash
+npm start
+```
+
+Then open:
+
+```text
+http://localhost:5000/
+```
+
+## Testing
+
+Run the API test suite with:
+
+```bash
+npm test
+```
+
+The test suite validates marketplace workflows such as registration, login, listing management, order creation, status updates, inventory logic, and review behavior.
+
+## Main workflows implemented
+
+- Customer signup and login
+- Business signup and login
+- User profile management
+- Food listing creation and editing
+- Daily inventory tracking for listings
+- Reservation and order processing
+- Customer cancellation flow
+- Business order progression
+- Sales recording after order completion
+- Customer review creation and management
+- Business review replies
+- Image upload support for food listings
+
+## Current limitations
+
+This project is a functional MVP and still has several planned future improvements:
+
+- No React frontend yet
+- No admin dashboard
+- No full delivery logistics system
+- No dynamic rescue pricing engine
+- No ML model or recommendation engine
+- Limited geographic mapping features
+
+## Roadmap
+
+Planned future work includes:
+- React-based frontend migration
+- More complete customer and business dashboards
+- Improved admin tools
+- Data analytics and sales insights
+- AI-powered demand prediction and surplus estimation
+- Smarter pricing recommendations
+
+## Contributing
+
+Contributions are welcome for improvements to the marketplace workflow, backend logic, data integrity, and documentation.
+
+Before making changes:
+- Read the project guidelines in [AGENTS.md](AGENTS.md)
+- Understand the current database schema and API behavior
+- Preserve compatibility with working flows
+- Keep changes minimal and focused
+
+## License
+
+This project is currently unlicensed unless explicitly stated otherwise.
+
+## Additional project context
+
+Broader project documentation and planning materials may also exist in the repository, such as the SRS. Those documents describe the intended long-term system, but the repository itself remains the source of truth for what is currently implemented.
