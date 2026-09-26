@@ -1,0 +1,11 @@
+<div id="restaurant" class="screen">
+    <button class="restaurant-back" type="button" data-click="showScreen" data-arg0="restaurants">← All restaurants</button>
+    <div id="restaurant-profile"></div>
+    <div class="restaurant-search-bar">
+      <label for="restaurant-food-search">Search in restaurant</label>
+      <input id="restaurant-food-search" type="search" placeholder="Search in restaurant" data-input="renderRestaurantMenu">
+      <button class="btn-sec" type="button" data-click="loadRestaurant">Refresh menu</button>
+    </div>
+    <p id="restaurant-menu-status" class="restaurant-results" role="status"></p>
+    <div id="restaurant-menu-grid" class="grid"></div>
+  </div>

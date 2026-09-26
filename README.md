@@ -83,7 +83,7 @@ The restaurant directory includes all active registered business accounts, inclu
 ## Tech stack
 
 ### Current stack in this repository
-- Frontend: HTML, CSS, and vanilla JavaScript
+- Frontend: HTML5, CSS3, and vanilla JavaScript with native ES modules
 - Backend: Node.js + Express
 - Database: PostgreSQL
 - Authentication: bcrypt + JWT
@@ -91,7 +91,7 @@ The restaurant directory includes all active registered business accounts, inclu
 - CORS: enabled for API access
 
 ### Important note
-This repository does not currently use React or Tailwind. The frontend is a plain static web UI, and there is no frontend build step in the current setup.
+PlateUp intentionally uses a modular vanilla frontend. It does not use React, Tailwind, TypeScript, or a frontend bundler. The browser loads native ES modules directly; there is no frontend build step.
 
 The AI/ML prediction features described in the broader project vision are not implemented yet in this codebase.
 
@@ -99,24 +99,50 @@ The AI/ML prediction features described in the broader project vision are not im
 
 ```text
 .
-├── assets/
-│   ├── css/
-│   └── js/
-├── server/
-│   ├── uploads/
-│   ├── db.js
-│   ├── index.js
-│   ├── init-db.sql
-│   ├── migrate.js
-│   └── migrate.sql
-├── test/
-│   └── api.test.js
-├── UI_PlateUp.html
+├── frontend/
+│   ├── index.html              # Application shell, served at /
+│   ├── views/                  # Home, auth, marketplace, restaurants, orders,
+│   │                           # favorites, recovery/reset, profile, business
+│   ├── components/             # Navbar and shared dialogs
+│   ├── css/styles.css          # Existing styling
+│   └── js/                     # Native ES modules grouped by responsibility
+├── assets/js/data.js           # Archived fixtures; not loaded by the app
+├── server/                     # Express APIs, PostgreSQL, migrations, uploads
+├── test/                       # API, frontend behavior, views and static-serving tests
+│   └── helpers/                # Isolated ES-module loader and DOM test double
+├── UI_PlateUp.html             # Compatibility launcher; no application screens
 ├── AGENTS.md
 ├── README.md
 ├── package.json
-└── PlateUp_SRS.pdf
+├── PlateUp_SRS.pdf
+├── PlateUP_ER.png
+└── PlateUp_Flowchart.png
 ```
+
+### Frontend organization
+
+`frontend/js/app.js` boots the application and installs polling once. `router.js`
+controls known screens, role redirects, remembered navigation and screen initialization.
+`views.js` fetches only allowlisted HTML partials. A screen loads on first use and stays
+mounted while hidden, preserving search fields and unfinished forms without full-page
+navigation. Concurrent loads are deduplicated; a slow earlier navigation cannot replace
+a newer selection. Failed view loads leave the current screen visible and show a retry.
+
+`state.js` holds shared session/feature state, `api.js` preserves the JSON API client,
+and `ui.js` holds formatting/dialog helpers. The feature modules are `auth`, `profile`,
+`marketplace`, `restaurants`, `listings`, `business`, `cart`, `orders`, `reviews`,
+`favorites`, `notifications`, and `home`. There are no global application handlers.
+
+The navbar and shared dialogs mount once. `events.js` delegates clicks, submissions,
+input and change events to an explicit action map, so generated cards and newly mounted
+views work without repeated listener registration. Do not put inline event code or
+scripts in partials. Background renderers check whether their view exists.
+
+To add a screen, create its markup in `frontend/views/`, add its controlled path to
+`views.js`, and register its initializer/role in `router.js`. Keep feature logic in its
+own module, reusing the API client and shared state. Login/signup remain one tabbed
+view; the existing business dashboard retains its tabs. No admin view is invented.
+
 
 ## Prerequisites
 
@@ -197,9 +223,15 @@ Then open:
 http://localhost:5000/
 ```
 
+The old `/UI_PlateUp.html` URL redirects to `/`. The root HTML file is only a
+compatibility launcher for older bookmarks/IDE usage. Use the Express URL rather than
+opening `frontend/index.html` as a file: HTML partial fetching and ES modules require
+HTTP. Existing installations need only a server restart for this refactor; it adds no
+dependencies and requires no database migration. Setup for a new database is unchanged.
+
 ## Testing
 
-Run the API test suite with:
+Run the API and frontend test suites with:
 
 ```bash
 npm test
@@ -208,6 +240,15 @@ npm test
 The test suite validates marketplace workflows such as registration, login, listing management, order creation, status updates, inventory logic, and review behavior.
 
 It also tests cart restoration and account/city isolation, catalog-driven filters, order timelines, favorites ownership/availability, concurrent expiry, rejection inventory, daily totals/CSV, and password reset expiry/reuse/session invalidation. Database integration tests create disposable accounts and clean their data afterward. No frontend build or lint command is configured; the frontend runs directly as HTML/CSS/JavaScript.
+
+Frontend tests import the actual ES-module graph using Node's `--experimental-vm-modules`
+flag (tests only). Existing behavior tests cover cart, portions, categories/time pickers,
+reviews, favorites, notifications and recovery. View tests use a strict DOM double
+populated from the actual partial markup to check missing-view safety, cached forms,
+role checks, loading failures/retries, navigation races, authentication, bootstrap and
+single listener/timer installation. Static-serving tests request every frontend file
+through Express, check imports/content types and verify private files remain inaccessible.
+These tests do not render CSS or replace a visual browser smoke test.
 
 ## Main workflows implemented
 
@@ -228,7 +269,6 @@ It also tests cart restoration and account/city isolation, catalog-driven filter
 
 This project is a functional MVP and still has several planned future improvements:
 
-- No React frontend yet
 - No admin dashboard
 - No full delivery logistics system
 - No dynamic rescue pricing engine
@@ -238,7 +278,6 @@ This project is a functional MVP and still has several planned future improvemen
 ## Roadmap
 
 Planned future work includes:
-- React-based frontend migration
 - More complete customer and business dashboards
 - Improved admin tools
 - Data analytics and sales insights

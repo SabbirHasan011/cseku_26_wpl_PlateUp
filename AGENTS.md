@@ -81,13 +81,18 @@ PlateUp aims to:
 
 # 4. Technology Stack
 
-The intended primary stack is:
+The agreed primary stack is:
 
 ## Frontend
 
-* React.js
-* Tailwind CSS
-* JavaScript/JSX unless the existing repository uses another established configuration
+* HTML5 + CSS3 + Vanilla JavaScript
+* Native browser ES modules; no frontend framework or bundler
+* `frontend/index.html` is the application shell, served at `/`
+* HTML partials live in `frontend/views/` and `frontend/components/`
+* Feature modules live in `frontend/js/`; shared styling lives in `frontend/css/`
+
+PlateUp intentionally remains vanilla. Do not introduce React, Tailwind, TypeScript,
+or a frontend framework/build system unless the user explicitly changes this decision.
 
 ## Backend
 
@@ -136,7 +141,7 @@ The main web application should conceptually follow:
 Customer / Business / Admin
 |
 v
-React Frontend
+Modular Vanilla Frontend
 |
 | HTTP / REST API
 v
@@ -151,7 +156,7 @@ Database operations should go through the backend.
 
 Future ML integration may conceptually follow:
 
-React Frontend
+Modular Vanilla Frontend
 |
 v
 Node.js / Express
@@ -1057,7 +1062,7 @@ Existing reasonable conventions should generally be preserved.
 
 # 23. Frontend Development Guidelines
 
-When modifying the React application:
+When modifying the vanilla frontend:
 
 1. Inspect existing components before creating duplicates.
 2. Reuse shared components where reasonable.
@@ -1071,6 +1076,19 @@ When modifying the React application:
 10. Maintain responsive behavior.
 
 Do not redesign the entire UI when implementing a backend feature unless explicitly requested.
+
+Frontend conventions:
+
+* Keep the shell small; add real screens through the allowlists in `router.js` and `views.js`.
+* Load partials from controlled paths and initialize only after their DOM exists.
+* Views are cached after first use, retaining search fields and unfinished forms.
+* Shared dialogs load once at startup. Do not run page-specific DOM code at module import time.
+* Use explicit imports/exports and `state.js`; do not attach application functions to `window`.
+* Use `data-click`, `data-submit`, `data-input`, or `data-change` with the explicit action map in `events.js`.
+* Install delegated listeners and polling once. Never evaluate handler strings or fetched JavaScript.
+* Background renderers must tolerate views that have not been mounted.
+* Keep backend authentication, ownership checks, API contracts, and database behavior authoritative.
+* Run `npm test`; frontend tests use Node VM modules with an isolated DOM double. A passing DOM test is not proof of browser layout.
 
 ---
 
@@ -1417,8 +1435,8 @@ At minimum, inspect relevant:
 * package.json files
 * frontend source
 * backend source
-* React routes
-* React pages/components
+* Vanilla navigation and view loading
+* HTML views/components and JavaScript feature modules
 * API calls
 * Express routes
 * Controllers

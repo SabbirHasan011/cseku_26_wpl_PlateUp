@@ -1,0 +1,39 @@
+<div id="customer" class="screen">
+
+    <div class="hero">
+      <h1>Good food, before it's gone.</h1>
+      <p>Local restaurants list fresh surplus meals at fraction of original price. Order now and pick up before close.</p>
+      <div class="marketplace-search-actions">
+        <div class="search-row">
+          <input type="text" id="loc-search" placeholder="City / District" data-input="filterListings">
+          <input type="text" id="food-search" placeholder="Search bakery, biryani, groceries..." data-input="filterListings">
+          <button data-click="filterListings">Search</button>
+        </div>
+        <button class="view-restaurants-btn" type="button" data-click="showScreen" data-arg0="restaurants">View Restaurants <span aria-hidden="true">↗</span></button>
+      </div>
+      <div class="rescue-stat">Browse available food and reserve it for pickup.</div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="chip-row" id="marketplace-categories">
+        <div class="chip on" data-click="filterCategory" data-category="All">All</div>
+        <div class="chip" data-click="filterCategory" data-category="Bakery">Bakery</div>
+        <div class="chip" data-click="filterCategory" data-category="Restaurant meal">Restaurant meal</div>
+        <div class="chip" data-click="filterCategory" data-category="Main Meal">Main Meal</div>
+        <div class="chip" data-click="filterCategory" data-category="Groceries">Groceries</div>
+        <div class="chip" data-click="filterCategory" data-category="Cafe">Cafe</div>
+        <div class="chip" data-click="filterCategory" data-category="Produce">Produce</div>
+      </div>
+      <div class="marketplace-actions">
+        <span id="listing-status" role="status">Loading listings…</span>
+        <button id="clear-listing-filters" type="button" data-click="clearListingFilters" hidden>Clear filters</button>
+        <button type="button" data-click="refreshMarketplace">Refresh listings</button>
+      </div>
+    </div>
+
+    <!-- Listing Grid Container -->
+    <div class="grid" id="listing-grid">
+      <!-- Dynamic Item Cards -->
+    </div>
+
+  </div>

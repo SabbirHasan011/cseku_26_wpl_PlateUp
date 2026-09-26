@@ -1,0 +1,63 @@
+<div id="login" class="screen">
+    <div class="auth-container">
+      
+      <!-- Tab Controls -->
+      <div class="auth-tabs">
+        <div class="auth-tab active" data-click="switchAuthMode" data-arg0="login">Sign In</div>
+        <div class="auth-tab" data-click="switchAuthMode" data-arg0="signup">Create Account</div>
+      </div>
+
+      <div class="auth-header">
+        <h2 id="auth-title">Welcome Back</h2>
+        <p id="auth-desc">Select your account role to continue</p>
+      </div>
+
+      <!-- Alert Banners -->
+      <div id="auth-error-banner" class="auth-error">Invalid email or password.</div>
+      <div id="auth-success-banner" class="auth-success">Account created! You can now sign in.</div>
+
+      <!-- Common Role Selector -->
+      <div class="role-picker">
+        <div class="role-opt selected" data-click="selectRole" data-arg0="customer">Customer</div>
+        <div class="role-opt" data-click="selectRole" data-arg0="business">Business</div>
+      </div>
+
+      <!-- SIGN IN FORM -->
+      <form id="form-login" class="auth-form active" data-submit="handleLogin">
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="login-email" placeholder="name@example.com" required>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-pass" required>
+        </div>
+        <button type="submit" class="btn-submit">Sign In</button>
+        <button type="button" class="password-recovery-link" data-click="openForgotPassword">Forgot password?</button>
+      </form>
+
+      <!-- SIGN UP FORM -->
+      <form id="form-signup" class="auth-form" data-submit="handleSignup">
+        <div class="form-group">
+          <label id="name-label">Full Name</label>
+          <input type="text" id="signup-name" placeholder="John Doe" required>
+        </div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="signup-email" placeholder="name@example.com" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="signup-pass" placeholder="••••••••" required>
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <input type="password" id="signup-pass-confirm" placeholder="••••••••" required>
+          </div>
+        </div>
+        <button type="submit" class="btn-submit">Create Account</button>
+      </form>
+
+    </div>
+  </div>
