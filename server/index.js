@@ -20,10 +20,15 @@ app.get('/', (_, res) => res.sendFile(path.join(__dirname, '..', 'UI_PlateUp.htm
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
 const clean = (value, max = 255) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const validId = value => Number.isSafeInteger(Number(value)) && Number(value) > 0;
+// Only trusted SQL column expressions are passed here. Empty cities never match.
+const viewerCitySql = `(SELECT COALESCE(c.city_id,b.city_id) FROM users viewer
+  LEFT JOIN customers c ON c.user_id=viewer.id
+  LEFT JOIN businesses b ON b.user_id=viewer.id WHERE viewer.id=$1)`;
 const listingSql = `WITH clock AS (SELECT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka' AS local_now)
   SELECT l.id,l.title,l.description,l.category,l.business_id,l.original_price,l.rescue_price,
     l.image_path,l.offer_start_time,l.offer_end_time,l.is_active,l.created_at,l.updated_at,
-    b.business_name,b.address AS pickup_address,b.city,
+    b.business_name,b.address AS pickup_address,b.city,b.city_id,
+    ratings.average_rating,COALESCE(ratings.review_count,0) AS review_count,
     a.id AS daily_availability_id,a.offer_date::text AS offer_date,
     a.initial_quantity,a.remaining_quantity,a.remaining_quantity AS quantity,
     CASE WHEN a.id IS NULL AND previous_a.id IS NOT NULL AND
@@ -35,7 +40,10 @@ const listingSql = `WITH clock AS (SELECT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/D
     a.offer_date + l.offer_start_time AS available_from,
     a.offer_date + l.offer_end_time + CASE WHEN l.offer_end_time<=l.offer_start_time
       THEN INTERVAL '1 day' ELSE INTERVAL '0 day' END AS available_until
-  FROM listings l JOIN businesses b ON b.user_id=l.business_id CROSS JOIN clock
+  FROM listings l JOIN businesses b ON b.user_id=l.business_id
+  LEFT JOIN (SELECT listing_id,ROUND(AVG(rating),1) AS average_rating,COUNT(*)::int AS review_count
+    FROM reviews WHERE listing_id IS NOT NULL GROUP BY listing_id) ratings ON ratings.listing_id=l.id
+  CROSS JOIN clock
   CROSS JOIN LATERAL (SELECT CASE WHEN l.offer_end_time<l.offer_start_time
     AND clock.local_now::time<l.offer_end_time THEN clock.local_now::date-1
     ELSE clock.local_now::date END AS offer_date) day
@@ -49,6 +57,12 @@ const reviewSql = `SELECT r.*,b.business_name,u.name AS author_name,
   COALESCE(l.title,r.item_name) AS item_name FROM reviews r
   JOIN businesses b ON b.user_id=r.business_id JOIN users u ON u.id=r.customer_id
   LEFT JOIN listings l ON l.id=r.listing_id`;
+const restaurantSql = `SELECT b.user_id AS id,b.business_name,b.description,b.address,b.city,
+    b.opening_time,b.closing_time,ratings.average_rating,COALESCE(ratings.review_count,0) AS review_count
+  FROM businesses b JOIN users u ON u.id=b.user_id
+  LEFT JOIN (SELECT business_id,ROUND(AVG(rating),1) AS average_rating,COUNT(*)::int AS review_count
+    FROM reviews GROUP BY business_id) ratings ON ratings.business_id=b.user_id
+  WHERE u.role='business' AND u.status='active'`;
 const imageUpload = multer({ storage:multer.memoryStorage(),
   limits:{ fileSize:5*1024*1024,files:1,fields:10,parts:11 },
   fileFilter:(_,file,callback) => {
@@ -103,6 +117,48 @@ function auth(req, res, next) {
 }
 const role = name => (req, res, next) => req.user.role === name ? next()
   : res.status(403).json({ message: 'This account cannot perform that action' });
+const optionalAuth = (req,res,next) => req.get('Authorization') ? auth(req,res,next) : next();
+function publicOrder(order,user) {
+  const { pickup_code,pickup_attempts,pickup_locked_until,...safe } = order;
+  if (user.role==='customer' && user.userId===order.customer_id && ['pending','confirmed','ready'].includes(order.status))
+    safe.pickup_code=pickup_code;
+  return safe;
+}
+async function notifyOrder(db,userId,orderId,event,message) {
+  await db.query(`INSERT INTO notifications(user_id,order_id,event,message) VALUES ($1,$2,$3,$4)
+    ON CONFLICT(user_id,order_id,event) DO NOTHING`,[userId,orderId,event,message]);
+}
+function cartInput(body) {
+  const items=Array.isArray(body.items)?body.items:[{ listing_id:body.listing_id,quantity:body.quantity }];
+  if (!items.length || items.length>30 || items.some(item=>!item || !validId(item.listing_id) || !validId(item.quantity) || Number(item.quantity)>100000)) return null;
+  const grouped=new Map();
+  for (const item of items) {
+    const id=Number(item.listing_id), previous=grouped.get(id);
+    const price=item.unit_price==null?null:Number(item.unit_price);
+    if (price!==null && (!Number.isFinite(price) || price<0)) return null;
+    if (previous && previous.unit_price!==price) return null;
+    grouped.set(id,{ listing_id:id,quantity:(previous?.quantity||0)+Number(item.quantity),unit_price:price });
+    if (grouped.get(id).quantity>100000) return null;
+  }
+  return [...grouped.values()].sort((a,b)=>a.listing_id-b.listing_id);
+}
+
+app.get('/api/cities',wrap(async (_,res)=>{
+  res.json((await pool.query('SELECT id,name,aliases FROM cities ORDER BY name')).rows);
+}));
+
+app.get('/api/categories',wrap(async (_,res)=>{
+  res.json((await pool.query('SELECT id,name FROM food_categories ORDER BY LOWER(name),id')).rows);
+}));
+app.post('/api/categories',auth,role('business'),wrap(async (req,res)=>{
+  const name=typeof req.body.name==='string' ? req.body.name.trim().replace(/\s+/g,' ') : '';
+  if (!name || name.length>100 || /[\x00-\x1F\x7F]/.test(name))
+    return res.status(400).json({ message:'Enter a category name between 1 and 100 characters.' });
+  const result=await pool.query(`INSERT INTO food_categories(name) VALUES ($1)
+    ON CONFLICT DO NOTHING RETURNING id,name`,[name]);
+  if (!result.rows.length) return res.status(409).json({ message:'This category already exists. Choose it from the dropdown.' });
+  res.status(201).json({ category:result.rows[0] });
+}));
 
 app.get('/api/health', wrap(async (_, res) => {
   await pool.query('SELECT 1');
@@ -149,8 +205,8 @@ app.post('/api/auth/login', wrap(async (req, res) => {
 
 app.get('/api/me', auth, wrap(async (req,res) => {
   const result = await pool.query(`SELECT u.id,u.name,u.email,u.role,u.phone,u.status,u.created_at,
-    c.address AS customer_address,c.city AS customer_city,c.preferred_location,
-    b.business_name,b.description,b.address AS business_address,b.city AS business_city,
+    c.address AS customer_address,c.city AS customer_city,c.city_id AS customer_city_id,c.preferred_location,
+    b.business_name,b.description,b.address AS business_address,b.city AS business_city,b.city_id AS business_city_id,
     b.phone AS business_phone,b.latitude,b.longitude,b.opening_time,b.closing_time
     FROM users u LEFT JOIN customers c ON c.user_id=u.id
     LEFT JOIN businesses b ON b.user_id=u.id WHERE u.id=$1 AND u.status='active'`,[req.user.userId]);
@@ -161,14 +217,25 @@ app.get('/api/me', auth, wrap(async (req,res) => {
 app.put('/api/me', auth, wrap(async (req,res) => {
   const name = clean(req.body.name);
   if (!name) return res.status(400).json({ message: 'Name is required' });
+  let city=null;
+  const cityProvided=Object.hasOwn(req.body,'city_id') || Object.hasOwn(req.body,'city');
+  if (req.body.city_id!=null && req.body.city_id!=='') {
+    if (!validId(req.body.city_id)) return res.status(400).json({ message:'Select a city from the list.' });
+    city=(await pool.query('SELECT id,name FROM cities WHERE id=$1',[req.body.city_id])).rows[0];
+    if (!city) return res.status(400).json({ message:'Select a city from the list.' });
+  } else if (!Object.hasOwn(req.body,'city_id') && clean(req.body.city)) {
+    const value=clean(req.body.city).replace(/\s+/g,' ').toLowerCase();
+    city=(await pool.query('SELECT id,name FROM cities WHERE LOWER(name)=$1 OR $1=ANY(aliases)',[value])).rows[0];
+    if (!city) return res.status(400).json({ message:'Select a city from the list.' });
+  }
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
     await db.query('UPDATE users SET name=$1,phone=$2,updated_at=NOW() WHERE id=$3',
       [name,clean(req.body.phone,50)||null,req.user.userId]);
     if (req.user.role === 'customer') {
-      await db.query('UPDATE customers SET address=$1,city=$2,preferred_location=$3 WHERE user_id=$4',
-        [clean(req.body.address,2000)||null,clean(req.body.city)||null,clean(req.body.preferred_location)||null,req.user.userId]);
+      await db.query('UPDATE customers SET address=$1,preferred_location=$2 WHERE user_id=$3',
+        [clean(req.body.address,2000)||null,clean(req.body.preferred_location)||null,req.user.userId]);
     } else if (req.user.role === 'business') {
       const latitude = req.body.latitude === '' || req.body.latitude == null ? null : Number(req.body.latitude);
       const longitude = req.body.longitude === '' || req.body.longitude == null ? null : Number(req.body.longitude);
@@ -177,11 +244,15 @@ app.put('/api/me', auth, wrap(async (req,res) => {
         await db.query('ROLLBACK');
         return res.status(400).json({ message:'Invalid coordinates' });
       }
-      await db.query(`UPDATE businesses SET business_name=$1,description=$2,address=$3,city=$4,
+      await db.query(`UPDATE businesses SET business_name=$1,description=$2,address=$3,city=CASE WHEN $11 THEN $4 ELSE city END,
         phone=$5,opening_time=$6,closing_time=$7,latitude=$9,longitude=$10 WHERE user_id=$8`,
         [clean(req.body.business_name)||name,clean(req.body.description,2000)||null,
-          clean(req.body.address,2000)||null,clean(req.body.city)||null,clean(req.body.phone,50)||null,
-          req.body.opening_time||null,req.body.closing_time||null,req.user.userId,latitude,longitude]);
+          clean(req.body.address,2000)||null,city?.name||null,clean(req.body.phone,50)||null,
+          req.body.opening_time||null,req.body.closing_time||null,req.user.userId,latitude,longitude,cityProvided]);
+    }
+    if (cityProvided && ['customer','business'].includes(req.user.role)) {
+      const table=req.user.role==='customer'?'customers':'businesses';
+      await db.query(`UPDATE ${table} SET city_id=$1,city=$2 WHERE user_id=$3`,[city?.id||null,city?.name||null,req.user.userId]);
     }
     await db.query('COMMIT');
     res.json({ message:'Profile updated' });
@@ -189,10 +260,27 @@ app.put('/api/me', auth, wrap(async (req,res) => {
   finally { db.release(); }
 }));
 
-app.get('/api/listings', wrap(async (_,res) => {
+app.get('/api/restaurants', optionalAuth, wrap(async (_,res) => {
+  const result=await pool.query(`${restaurantSql} ORDER BY LOWER(b.business_name),b.user_id`);
+  res.set('Cache-Control','private, no-store');
+  res.json(result.rows);
+}));
+app.get('/api/restaurants/:id', optionalAuth, wrap(async (req,res) => {
+  if (!validId(req.params.id)) return res.status(400).json({ message:'Invalid restaurant ID' });
+  const restaurant=await pool.query(`${restaurantSql} AND b.user_id=$1`,[req.params.id]);
+  if (!restaurant.rows.length) return res.status(404).json({ message:'Restaurant not found' });
+  const menu=await pool.query(`SELECT * FROM (${listingSql}) items
+    WHERE business_id=$2 AND is_active=TRUE AND daily_status='Active'
+    AND city_id=${viewerCitySql} ORDER BY title,id`,[req.user?.userId || null,req.params.id]);
+  res.set('Cache-Control','private, no-store');
+  res.json({ restaurant:restaurant.rows[0],listings:menu.rows });
+}));
+
+app.get('/api/listings', optionalAuth, wrap(async (req,res) => {
   const result = await pool.query(`SELECT * FROM (${listingSql}) items
-    WHERE is_active=TRUE AND daily_status='Active' ORDER BY id DESC`);
-  res.set('Cache-Control','no-store');
+    WHERE is_active=TRUE AND daily_status='Active' AND city_id=${viewerCitySql}
+    ORDER BY id DESC`,[req.user?.userId || null]);
+  res.set('Cache-Control','private, no-store');
   res.json(result.rows);
 }));
 app.get('/api/business/listings', auth, role('business'), wrap(async (req,res) => {
@@ -207,16 +295,18 @@ app.get('/api/business/listings/:id', auth, role('business'), wrap(async (req,re
   if (!result.rows.length) return res.status(404).json({ message:'Food item not found' });
   res.json({ listing:result.rows[0] });
 }));
-app.get('/api/listings/:id', wrap(async (req,res) => {
+app.get('/api/listings/:id', optionalAuth, wrap(async (req,res) => {
   if (!validId(req.params.id)) return res.status(400).json({ message:'Invalid listing ID' });
   const result = await pool.query(`SELECT * FROM (${listingSql}) items
-    WHERE id=$1 AND is_active=TRUE AND daily_status='Active'`,[req.params.id]);
+    WHERE id=$2 AND is_active=TRUE AND daily_status='Active'
+    AND city_id=${viewerCitySql}`,[req.user?.userId || null,req.params.id]);
   if (!result.rows.length) return res.status(404).json({ message:'Listing not found' });
+  res.set('Cache-Control','private, no-store');
   res.json({ listing:result.rows[0] });
 }));
 
-function listingInput(body) {
-  const title = clean(body.title), category = clean(body.category,100);
+async function listingInput(body) {
+  const title = clean(body.title), category = typeof body.category==='string' ? body.category.trim() : '';
   const original = Number(body.original_price), rescue = Number(body.rescue_price);
   const start = clean(body.offer_start_time,5), end = clean(body.offer_end_time,5);
   if (!title || !category || body.original_price==='' || body.rescue_price==='' ||
@@ -224,10 +314,12 @@ function listingInput(body) {
     !Number.isFinite(rescue) || rescue<0 || rescue>original ||
     !/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end))
     return { error:'Enter a title, category, valid prices, and daily offer start/end times.' };
-  return { values:[title,category,clean(body.description,2000)||null,original,rescue,start,end] };
+  const saved=await pool.query('SELECT name FROM food_categories WHERE LOWER(name)=LOWER($1)',[category]);
+  if (!saved.rows.length) return { error:'Choose a saved category, or use Add Category first.' };
+  return { values:[title,saved.rows[0].name,clean(body.description,2000)||null,original,rescue,start,end] };
 }
 app.post('/api/listings', auth, role('business'), imageUpload.single('image'), wrap(async (req,res) => {
-  const parsed = listingInput(req.body);
+  const parsed = await listingInput(req.body);
   if (parsed.error) return res.status(400).json({ message:parsed.error });
   let imagePath=null;
   let imageCommitted=false;
@@ -245,7 +337,7 @@ app.post('/api/listings', auth, role('business'), imageUpload.single('image'), w
   } catch(error) { if (!imageCommitted) await removeImage(imagePath); throw error; }
 }));
 app.put('/api/listings/:id', auth, role('business'), imageUpload.single('image'), wrap(async (req,res) => {
-  const parsed = listingInput(req.body);
+  const parsed = await listingInput(req.body);
   if (!validId(req.params.id)||parsed.error) return res.status(400).json({ message:parsed.error||'Invalid listing ID' });
   const own=await pool.query('SELECT image_path FROM listings WHERE id=$1 AND business_id=$2 AND is_active=TRUE',
     [req.params.id,req.user.userId]);
@@ -313,20 +405,39 @@ app.put('/api/listings/:id/today', auth, role('business'), wrap(async (req,res) 
   finally { db.release(); }
 }));
 
+app.post('/api/cart/quote',auth,role('customer'),wrap(async (req,res)=>{
+  const input=cartInput(req.body);
+  if (!input) return res.status(400).json({ message:'Choose valid listings and positive quantities.' });
+  const found=await pool.query(`SELECT * FROM (${listingSql}) items WHERE id=ANY($2::int[])
+    AND is_active=TRUE AND daily_status='Active' AND city_id=${viewerCitySql}`,
+    [req.user.userId,input.map(item=>item.listing_id)]);
+  const items=input.map(requested=>{
+    const item=found.rows.find(row=>row.id===requested.listing_id);
+    return { listing_id:requested.listing_id,quantity:requested.quantity,title:item?.title,
+      unit_price:item?Number(item.rescue_price):null,available_quantity:item?.quantity||0,
+      total_price:item?Number((Number(item.rescue_price)*requested.quantity).toFixed(2)):0,
+      error:!item?'No longer available in your city.':requested.quantity>item.quantity?
+        'Only '+item.quantity+' portions remain.':null };
+  });
+  res.set('Cache-Control','private, no-store');
+  res.json({ items,valid:items.every(item=>!item.error),
+    total_price:Number(items.reduce((sum,item)=>sum+item.total_price,0).toFixed(2)) });
+}));
 app.post('/api/orders', auth, role('customer'), wrap(async (req,res) => {
-  const items = Array.isArray(req.body.items) ? req.body.items : [{ listing_id:req.body.listing_id,quantity:req.body.quantity }];
-  if (!items.length || items.length>30 || items.some(item=>!validId(item.listing_id)||!validId(item.quantity)))
+  const items=cartInput(req.body);
+  if (!items)
     return res.status(400).json({ message:'Choose valid listings and positive quantities' });
-  const combined = new Map();
-  for (const item of items) combined.set(Number(item.listing_id),(combined.get(Number(item.listing_id))||0)+Number(item.quantity));
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
     const orders=[];
-    for (const [listingId,quantity] of [...combined].sort((a,b)=>a[0]-b[0])) {
+    for (const { listing_id:listingId,quantity,unit_price } of items) {
       const stock = await db.query(`UPDATE daily_availability a SET
         remaining_quantity=a.remaining_quantity-$1,updated_at=NOW()
         FROM listings l WHERE a.listing_id=l.id AND l.id=$2 AND l.is_active=TRUE
+        AND EXISTS (SELECT 1 FROM businesses b JOIN customers c ON c.user_id=$3
+          WHERE b.user_id=l.business_id AND b.city_id=c.city_id)
+        AND ($4::numeric IS NULL OR l.rescue_price=$4)
         AND a.offer_date=CASE WHEN l.offer_end_time<l.offer_start_time AND
           (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::time<l.offer_end_time
           THEN (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date-1
@@ -334,10 +445,10 @@ app.post('/api/orders', auth, role('customer'), wrap(async (req,res) => {
         AND a.remaining_quantity>=$1
         AND plateup_daily_status(a.offer_date,a.remaining_quantity,l.offer_start_time,
           l.offer_end_time,CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')='Active'
-        RETURNING a.id,l.rescue_price`,[quantity,listingId]);
+        RETURNING a.id,l.rescue_price,l.business_id,l.title`,[quantity,listingId,req.user.userId,unit_price]);
       if (!stock.rows.length) {
         await db.query('ROLLBACK');
-        return res.status(409).json({ message:'An item is sold out or no longer available. Refresh and try again.' });
+        return res.status(409).json({ message:'An item has changed price, is outside your saved city, or no longer has enough stock. Review your cart and try again.' });
       }
       const total = Number(stock.rows[0].rescue_price)*quantity;
       const created = await db.query(`INSERT INTO orders
@@ -345,7 +456,12 @@ app.post('/api/orders', auth, role('customer'), wrap(async (req,res) => {
         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
         [req.user.userId,listingId,stock.rows[0].id,quantity,total,
           clean(req.body.payment_method,50)||'Pay at pickup']);
-      orders.push(created.rows[0]);
+      const order=created.rows[0];
+      const code=order.id+'-'+crypto.randomBytes(3).toString('hex').toUpperCase();
+      await db.query('UPDATE orders SET pickup_code=$1 WHERE id=$2',[code,order.id]);
+      orders.push(publicOrder({ ...order,pickup_code:code },req.user));
+      await notifyOrder(db,stock.rows[0].business_id,order.id,'new_order',
+        'New reservation #'+order.id+': '+quantity+' portions of '+stock.rows[0].title+'.');
     }
     await db.query('COMMIT');
     res.status(201).json({ orders });
@@ -355,7 +471,8 @@ app.post('/api/orders', auth, role('customer'), wrap(async (req,res) => {
 app.get('/api/orders', auth, wrap(async (req,res) => {
   const condition = req.user.role==='customer'?'o.customer_id=$1':'l.business_id=$1';
   const result = await pool.query(`${orderSql} WHERE ${condition} ORDER BY o.id DESC`,[req.user.userId]);
-  res.json(result.rows);
+  res.set('Cache-Control','private, no-store');
+  res.json(result.rows.map(order=>publicOrder(order,req.user)));
 }));
 app.patch('/api/orders/:id', auth, wrap(async (req,res) => {
   if (!validId(req.params.id)) return res.status(400).json({ message:'Invalid order ID' });
@@ -372,7 +489,21 @@ app.patch('/api/orders/:id', auth, wrap(async (req,res) => {
     const allowed=customer?['pending','confirmed'].includes(order.status)&&next==='cancelled'
       :({ pending:'confirmed',confirmed:'ready',ready:'completed' })[order.status]===next;
     if (!allowed) { await db.query('ROLLBACK'); return res.status(400).json({ message:'Invalid order status change' }); }
+    if (next==='completed') {
+      const locked=order.pickup_locked_until && new Date(order.pickup_locked_until).getTime()>Date.now();
+      if (locked) { await db.query('ROLLBACK'); return res.status(429).json({ message:'Too many incorrect pickup codes. Try again in five minutes.' }); }
+      const supplied=clean(req.body.pickup_code,100).toUpperCase();
+      if (!order.pickup_code || supplied!==order.pickup_code) {
+        await db.query(`UPDATE orders SET pickup_attempts=CASE WHEN pickup_locked_until IS NOT NULL THEN 1 ELSE pickup_attempts+1 END,
+          pickup_locked_until=CASE WHEN pickup_locked_until IS NULL AND pickup_attempts>=4 THEN NOW()+INTERVAL '5 minutes' ELSE NULL END
+          WHERE id=$1`,[order.id]);
+        await db.query('COMMIT');
+        return res.status(400).json({ message:'Incorrect pickup code. Ask the customer for the code shown in their order.' });
+      }
+    }
     const updated=await db.query(`UPDATE orders SET status=$1::varchar,updated_at=NOW(),
+      pickup_time=CASE WHEN $1::varchar='completed' THEN NOW() ELSE pickup_time END,
+      pickup_attempts=0,pickup_locked_until=NULL,
       payment_status=CASE WHEN $1::varchar='completed' AND payment_method='Pay at pickup' THEN 'paid'
       ELSE payment_status END WHERE id=$2 RETURNING *`,[next,order.id]);
     if (next==='cancelled' && order.daily_availability_id) await db.query(`UPDATE daily_availability
@@ -382,10 +513,34 @@ app.patch('/api/orders/:id', auth, wrap(async (req,res) => {
       (business_id,listing_id,order_id,quantity_sold,price) VALUES ($1,$2,$3,$4,$5)
       ON CONFLICT (order_id) DO NOTHING`,
       [order.business_id,order.listing_id,order.id,order.quantity,order.total_price]);
+    await notifyOrder(db,customer?order.business_id:order.customer_id,order.id,next,
+      'Reservation #'+order.id+' for '+order.listing_title+' is '+(next==='ready'?'ready for pickup':next)+'.');
     await db.query('COMMIT');
-    res.json({ order:updated.rows[0] });
+    res.json({ order:publicOrder(updated.rows[0],req.user) });
   } catch(error) { await db.query('ROLLBACK'); throw error; }
   finally { db.release(); }
+}));
+
+app.get('/api/notifications',auth,wrap(async (req,res)=>{
+  const [items,unread]=await Promise.all([
+    pool.query('SELECT id,order_id,event,message,read_at,created_at FROM notifications WHERE user_id=$1 ORDER BY id DESC LIMIT 50',[req.user.userId]),
+    pool.query('SELECT COUNT(*)::int AS count FROM notifications WHERE user_id=$1 AND read_at IS NULL',[req.user.userId])
+  ]);
+  res.set('Cache-Control','private, no-store');
+  res.json({ notifications:items.rows,unread_count:unread.rows[0].count });
+}));
+app.patch('/api/notifications/read',auth,wrap(async (req,res)=>{
+  if (!validId(req.body.through_id)) return res.status(400).json({ message:'Invalid notification ID.' });
+  await pool.query('UPDATE notifications SET read_at=NOW() WHERE user_id=$1 AND id<=$2 AND read_at IS NULL',
+    [req.user.userId,req.body.through_id]);
+  res.json({ message:'Notifications marked as read.' });
+}));
+app.patch('/api/notifications/:id/read',auth,wrap(async (req,res)=>{
+  if (!validId(req.params.id)) return res.status(400).json({ message:'Invalid notification ID.' });
+  const result=await pool.query('UPDATE notifications SET read_at=COALESCE(read_at,NOW()) WHERE id=$1 AND user_id=$2 RETURNING id',
+    [req.params.id,req.user.userId]);
+  if (!result.rows.length) return res.status(404).json({ message:'Notification not found.' });
+  res.json({ message:'Notification marked as read.' });
 }));
 
 app.get('/api/reviews', wrap(async (_,res) => {
@@ -463,6 +618,9 @@ app.get('/api/business/predictions', auth, role('business'), wrap(async (req,res
   res.json(result.rows);
 }));
 
+app.use('/api',(_,res)=>res.status(404).json({
+  message:'This API route is not available. Restart the PlateUp backend if you recently updated the project.'
+}));
 app.use((error,req,res,next) => {
   const status=error instanceof multer.MulterError || error.status===400 ||
     ['23503','23514','22P02'].includes(error.code) ? 400 : error.status || 500;
@@ -471,6 +629,14 @@ app.use((error,req,res,next) => {
     ? 'Image must be 5 MB or smaller.' : error.status===400 ? error.message : 'Request could not be completed';
   res.status(status).json({ message });
 });
-if (require.main===module) app.listen(process.env.PORT||5000,()=>
-  console.log(`PlateUp server running on http://localhost:${process.env.PORT||5000}`));
+if (require.main===module) {
+  const port=process.env.PORT||5000;
+  const server=app.listen(port,()=>console.log(`PlateUp server running on http://localhost:${port}`));
+  server.on('error',error=>{
+    console.error(error.code==='EADDRINUSE'
+      ? `Port ${port} is already in use. This copy of PlateUp did not start. Stop the existing backend with Ctrl+C in its terminal, then run npm start again.`
+      : 'PlateUp could not start: '+error.message);
+    pool.end().finally(()=>{ process.exitCode=1; });
+  });
+}
 module.exports=app;

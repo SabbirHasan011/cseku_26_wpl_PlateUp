@@ -24,33 +24,75 @@
   <!-- ============ LANDING HOMEPAGE SCREEN ============ -->
   <div id="home" class="screen active">
     
-    <div class="home-hero">
-      <h1>Rescue Fresh Food,<br>Cut Waste, Save Up to 70%</h1>
-      <p>PlateUp connects local restaurants, bakeries, and grocery stores with nearby customers to offer surplus food at discounted pickup prices.</p>
-      <div class="cta-group">
-        <button class="btn-hero-pri" onclick="showScreen('customer')">Browse Surplus Deals</button>
-        <button class="btn-hero-sec" onclick="showScreen('login')">Partner as a Business</button>
+    <section class="home-hero" id="home-banner" aria-label="Discover PlateUp" aria-roledescription="carousel">
+      <div class="home-banner-slides">
+        <article class="home-banner-slide rescue-slide active" id="home-banner-slide-0" role="group" aria-roledescription="slide" aria-label="1 of 2: Rescue fresh food">
+          <div class="banner-copy">
+            <span class="banner-eyebrow"><span aria-hidden="true">✦</span> Good food deserves a second chance</span>
+            <h1>Rescue Fresh Food,<br>Cut Waste,<br><em>Save Up to 70%</em></h1>
+            <p>Great meals. Smaller bills. Discover surplus food from local kitchens and make your next pickup count.</p>
+            <div class="cta-group">
+              <button class="btn-hero-pri" onclick="showScreen('customer')">Explore meals <span aria-hidden="true">↗</span></button>
+              <button class="btn-hero-sec" onclick="showScreen('login')">Partner as a Business</button>
+            </div>
+          </div>
+          <div class="banner-art" aria-hidden="true">
+            <div class="banner-orbit"></div>
+            <svg class="banner-plate" viewBox="0 0 320 320" fill="none">
+              <circle cx="160" cy="160" r="150" fill="#FAF7ED"/>
+              <circle cx="160" cy="160" r="131" stroke="#E1DECC" stroke-width="2"/>
+              <circle cx="160" cy="160" r="117" fill="#EFECDF"/>
+              <path d="M65 137C67 90 129 65 155 99C181 66 236 86 247 124C282 153 247 207 214 210C193 254 141 251 117 220C70 225 46 178 65 137Z" fill="#4F8351"/>
+              <path d="M89 119C124 115 149 132 158 163C113 175 84 155 89 119Z" fill="#86A85F"/>
+              <path d="M180 94C211 101 231 128 219 156C185 157 166 126 180 94Z" fill="#A3BC76"/>
+              <path d="M145 188C171 172 203 176 217 204C193 234 162 225 145 188Z" fill="#86A85F"/>
+              <rect x="109" y="108" width="55" height="111" rx="21" transform="rotate(-28 109 108)" fill="#DDA157"/>
+              <path d="M139 124L166 110M148 144L177 129M159 166L187 151M170 187L197 173" stroke="#AB7138" stroke-width="5" stroke-linecap="round"/>
+              <circle cx="99" cy="179" r="21" fill="#D9614F"/><circle cx="99" cy="179" r="13" stroke="#F29973" stroke-width="3"/>
+              <circle cx="212" cy="174" r="19" fill="#D9614F"/><circle cx="212" cy="174" r="11" stroke="#F29973" stroke-width="3"/>
+              <path d="M205 93L249 108A29 29 0 0 1 205 93Z" fill="#F2CA66" stroke="#FBDF8D" stroke-width="5"/>
+              <path d="M110 96L119 101M89 148L98 153M144 216L153 211M225 135L234 140" stroke="#FAF7ED" stroke-width="4" stroke-linecap="round"/>
+            </svg>
+            <span class="banner-art-note">Fresh finds.<br><strong>Less left behind.</strong></span>
+            <span class="banner-savings">Save up to<strong>70<span>%</span></strong><small>on surplus food</small></span>
+          </div>
+        </article>
+        <article class="home-banner-slide benefits-slide" id="home-banner-slide-1" role="group" aria-roledescription="slide" aria-label="2 of 2: How PlateUp works" aria-hidden="true" inert>
+          <div class="banner-copy">
+            <span class="banner-eyebrow">A little rescue. A lot of good.</span>
+            <h2>Your next meal.<br><em>A better deal.</em></h2>
+            <p>From a local kitchen to your table, enjoy good food with a little less waste along the way.</p>
+            <button class="btn-hero-pri" onclick="showScreen('customer')">Find your next meal <span aria-hidden="true">↗</span></button>
+          </div>
+          <div class="banner-benefits">
+            <div class="banner-benefit">
+              <span class="benefit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3h8l10 10-8 8L3 11V3Z"/><circle cx="7.5" cy="7.5" r="1"/><path d="m10 15 5-5"/></svg></span>
+              <div><span class="benefit-step">01 / A smaller bill</span><h3>Rescue Prices</h3><p>Enjoy surplus meals at discounted prices set by local businesses.</p></div>
+            </div>
+            <div class="banner-benefit">
+              <span class="benefit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></span>
+              <div><span class="benefit-step">02 / Around your corner</span><h3>Local Pickup</h3><p>Find meals in your city and collect them directly from the kitchen.</p></div>
+            </div>
+            <div class="banner-benefit">
+              <span class="benefit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg></span>
+              <div><span class="benefit-step">03 / Share the good</span><h3>Order Reviews</h3><p>Picked up your meal? Share your experience with the community.</p></div>
+            </div>
+          </div>
+        </article>
       </div>
-    </div>
-
-    <!-- Feature Value Props -->
-    <div class="features-grid">
-      <div class="feature-card">
-        <span class="feature-icon">🤖</span>
-        <h3 class="feature-title">Rescue Prices</h3>
-        <p class="feature-desc">Businesses set their own discounted prices for surplus meals.</p>
+      <div class="banner-controls">
+        <span class="banner-caption" id="banner-caption">Good food. Better possibilities.</span>
+        <div class="banner-navigation">
+          <button class="banner-arrow" type="button" aria-label="Previous banner" onclick="showHomeBanner(homeBannerIndex-1)">←</button>
+          <div class="banner-dots">
+            <button type="button" class="active" aria-label="Show food rescue banner" aria-controls="home-banner-slide-0" aria-current="true" onclick="showHomeBanner(0)"></button>
+            <button type="button" aria-label="Show PlateUp benefits" aria-controls="home-banner-slide-1" aria-current="false" onclick="showHomeBanner(1)"></button>
+          </div>
+          <button class="banner-arrow" type="button" aria-label="Next banner" onclick="showHomeBanner(homeBannerIndex+1)">→</button>
+          <button class="banner-pause" id="banner-pause" type="button" aria-label="Pause automatic banners" aria-pressed="false" onclick="toggleHomeBannerPlayback()">Pause</button>
+        </div>
       </div>
-      <div class="feature-card">
-        <span class="feature-icon">📍</span>
-        <h3 class="feature-title">Local Pickup</h3>
-        <p class="feature-desc">Browse nearby listings and collect reserved meals from the business.</p>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">⭐</span>
-        <h3 class="feature-title">Order Reviews</h3>
-        <p class="feature-desc">Customers can review a meal after its pickup is completed.</p>
-      </div>
-    </div>
+    </section>
 
     <!-- Featured Live Deals Section -->
     <div class="panel">
@@ -149,10 +191,13 @@
     <div class="hero">
       <h1>Good food, before it's gone.</h1>
       <p>Local restaurants list fresh surplus meals at fraction of original price. Order now and pick up before close.</p>
-      <div class="search-row">
-        <input type="text" id="loc-search" placeholder="City / District" onkeyup="filterListings()">
-        <input type="text" id="food-search" placeholder="Search bakery, biryani, groceries..." onkeyup="filterListings()">
-        <button onclick="filterListings()">Search</button>
+      <div class="marketplace-search-actions">
+        <div class="search-row">
+          <input type="text" id="loc-search" placeholder="City / District" onkeyup="filterListings()">
+          <input type="text" id="food-search" placeholder="Search bakery, biryani, groceries..." onkeyup="filterListings()">
+          <button onclick="filterListings()">Search</button>
+        </div>
+        <button class="view-restaurants-btn" type="button" onclick="showScreen('restaurants')">View Restaurants <span aria-hidden="true">↗</span></button>
       </div>
       <div class="rescue-stat">Browse available food and reserve it for pickup.</div>
     </div>
@@ -179,6 +224,33 @@
       <!-- Dynamic Item Cards -->
     </div>
 
+  </div>
+
+  <!-- Restaurant discovery and menu -->
+  <div id="restaurants" class="screen">
+    <button class="restaurant-back" type="button" onclick="showScreen('customer')">← Back to marketplace</button>
+    <div class="restaurant-directory-heading">
+      <div><p class="profile-label">Meet your local kitchens</p><h1>Good food starts here.</h1><p>Explore restaurants, cafés, bakeries, and food businesses on PlateUp.</p></div>
+      <span class="restaurant-heading-mark" aria-hidden="true">↗</span>
+    </div>
+    <div class="restaurant-search-bar">
+      <label for="restaurant-search">Find a restaurant</label>
+      <input id="restaurant-search" type="search" placeholder="Search restaurant or city…" oninput="renderRestaurants()">
+      <button class="btn-sec" type="button" onclick="loadRestaurants()">Refresh</button>
+    </div>
+    <p id="restaurant-directory-status" class="restaurant-results" role="status"></p>
+    <div id="restaurant-grid" class="restaurant-grid"></div>
+  </div>
+  <div id="restaurant" class="screen">
+    <button class="restaurant-back" type="button" onclick="showScreen('restaurants')">← All restaurants</button>
+    <div id="restaurant-profile"></div>
+    <div class="restaurant-search-bar">
+      <label for="restaurant-food-search">Search in restaurant</label>
+      <input id="restaurant-food-search" type="search" placeholder="Search in restaurant" oninput="renderRestaurantMenu()">
+      <button class="btn-sec" type="button" onclick="loadRestaurant()">Refresh menu</button>
+    </div>
+    <p id="restaurant-menu-status" class="restaurant-results" role="status"></p>
+    <div id="restaurant-menu-grid" class="grid"></div>
   </div>
 
   <!-- ============ PROFILE SCREEN ============ -->
@@ -224,7 +296,7 @@
         </div>
         <div class="form-group"><label>Address</label><input id="profile-edit-address"></div>
         <div class="form-row">
-          <div class="form-group"><label>City</label><input id="profile-edit-city"></div>
+          <div class="form-group"><label for="profile-edit-city">City</label><input id="profile-edit-city" list="city-options" autocomplete="off" placeholder="Search and select a city"><small>Choose a suggested city to find matching restaurants.</small></div>
           <div class="form-group"><label>Preferred location</label><input id="profile-edit-location"></div>
         </div>
         <button class="btn-pri" type="submit">Save profile</button>
@@ -259,10 +331,10 @@
         </div>
         <div class="navitem on" onclick="switchBizTab('overview', this)">Overview</div>
         <div class="navitem" data-biz-tab="listings" onclick="switchBizTab('listings', this)">Manage Listings</div>
-        <div class="navitem" onclick="switchBizTab('orders', this)">Orders</div>
+        <div class="navitem" data-biz-tab="orders" onclick="switchBizTab('orders', this)">Orders</div>
         <div class="navitem" onclick="switchBizTab('analytics', this)">Sales & Predictions</div>
         <div class="navitem" onclick="switchBizTab('reviews', this)">Customer Reviews</div>
-        <div class="navitem" onclick="switchBizTab('profile', this)">Business Profile</div>
+        <div class="navitem" id="business-profile-nav" onclick="switchBizTab('profile', this)">Business Profile</div>
         <button class="newlist-btn" onclick="openNewListingModal()">+ Add Food Item</button>
       </div>
 
@@ -285,9 +357,12 @@
             </div>
           </div>
 
-          <div class="panel">
-            <h3>Manage Food Items</h3>
-            <p class="profile-muted">Save each food item once. Enter its total quantity each day to offer it during its regular window. Times use Bangladesh time.</p>
+          <div class="panel manage-panel">
+            <div class="manage-panel-heading">
+              <div><p class="manage-eyebrow">Your daily menu</p><h3>Manage Listings <span id="business-item-count" class="manage-count">0</span></h3></div>
+              <button class="btn-pri" type="button" onclick="openNewListingModal()">+ Add food item</button>
+            </div>
+            <p class="manage-panel-note">Your items, saved once. Just update today's portions. Offer times use Bangladesh time.</p>
             <div id="business-listings" class="manage-listings"></div>
           </div>
 
@@ -311,7 +386,7 @@
             <div class="form-group"><label>Description</label><textarea id="business-profile-description"></textarea></div>
             <div class="form-group"><label>Pickup address</label><input id="business-profile-address"></div>
             <div class="form-row">
-              <div class="form-group"><label>City</label><input id="business-profile-city"></div>
+              <div class="form-group"><label for="business-profile-city">City</label><input id="business-profile-city" list="city-options" autocomplete="off" placeholder="Search and select a city"><small>Choose a suggested city so local customers can find you.</small></div>
               <div class="form-group"><label>Opening time</label><input id="business-profile-open" type="time"></div>
               <div class="form-group"><label>Closing time</label><input id="business-profile-close" type="time"></div>
             </div>
@@ -347,48 +422,58 @@
 
 <!-- Modal: Add or edit a reusable food item -->
 <div class="modal-overlay" id="new-listing-modal">
-  <div class="modal">
-    <h3 id="listing-modal-title">Add Food Item</h3>
-    <div class="form-group">
-      <label>Title</label>
-      <input type="text" id="m-title" placeholder="e.g. Mixed Pastry surprise box">
+  <div class="modal food-editor" role="dialog" aria-modal="true" aria-labelledby="listing-modal-title">
+    <header class="food-editor-header">
+      <div><p class="profile-label">Your kitchen's collection</p><h3 id="listing-modal-title">Add Food Item</h3><p>Save it once. Set available portions each day.</p></div>
+      <button class="food-editor-close" type="button" aria-label="Close food item form" onclick="closeModal('new-listing-modal')">&times;</button>
+    </header>
+    <div class="food-editor-body">
+      <section class="food-editor-section">
+        <h4><span>01</span> The food</h4>
+        <div class="form-group"><label for="m-title">Item name</label><input type="text" id="m-title" maxlength="255" placeholder="e.g. Chicken biryani with egg" required></div>
+        <div class="form-group">
+          <label for="m-category">Category</label>
+          <div class="category-controls"><select id="m-category" required><option value="">Choose a category</option></select><button class="add-category-btn" type="button" onclick="toggleCategoryEditor()" aria-expanded="false" aria-controls="category-editor" id="add-category-toggle">+ Add Category</button></div>
+          <div id="category-editor" class="category-editor" hidden>
+            <label for="new-category-name">New category name</label>
+            <div class="category-controls"><input id="new-category-name" type="text" maxlength="100" placeholder="e.g. Desserts" onkeydown="if(event.key==='Enter'){event.preventDefault();saveFoodCategory();}"><button class="btn-pri" id="save-category-btn" type="button" onclick="saveFoodCategory()">Add</button><button class="btn-sec" type="button" onclick="toggleCategoryEditor(false)">Cancel</button></div>
+          </div>
+          <p id="category-feedback" class="editor-feedback" role="status"></p>
+        </div>
+        <div class="form-group"><label for="m-description">Description</label><textarea id="m-description" rows="2" maxlength="2000" placeholder="Tell customers what's included in each portion…"></textarea></div>
+      </section>
+      <section class="food-editor-section">
+        <h4><span>02</span> Set your prices <small>Per portion</small></h4>
+        <div class="form-row">
+          <div class="form-group"><label for="m-orig-price">Original price (৳)</label><input type="number" id="m-orig-price" placeholder="300" min="0" step="1" required></div>
+          <div class="form-group rescue-price-field"><label for="m-rescue-price">Rescue price (৳)</label><input type="number" id="m-rescue-price" placeholder="150" min="0" step="1" required></div>
+        </div>
+      </section>
+      <section class="food-editor-section offer-editor">
+        <h4><span>03</span> Daily offer window <small>Bangladesh time</small></h4>
+        <div class="form-row">
+          <div class="form-group"><label id="m-start-label">Starts at</label><input type="hidden" id="m-start"><button id="m-start-trigger" class="offer-time-trigger" type="button" aria-labelledby="m-start-label m-start-display" aria-expanded="false" aria-controls="offer-time-picker" onclick="openOfferTimePicker('m-start')"><span id="m-start-display">8:00 PM</span><span aria-hidden="true">◷</span></button></div>
+          <div class="form-group"><label id="m-end-label">Ends at</label><input type="hidden" id="m-end"><button id="m-end-trigger" class="offer-time-trigger" type="button" aria-labelledby="m-end-label m-end-display" aria-expanded="false" aria-controls="offer-time-picker" onclick="openOfferTimePicker('m-end')"><span id="m-end-display">12:00 AM</span><span aria-hidden="true">◷</span></button></div>
+        </div>
+        <div id="offer-time-picker" class="offer-time-picker" hidden>
+          <div class="time-picker-heading"><strong id="time-picker-title">Choose start time</strong><button type="button" onclick="closeOfferTimePicker()" aria-label="Cancel time selection">&times;</button></div>
+          <div id="time-picker-steps" class="time-picker-steps"></div>
+          <p id="time-picker-instruction" aria-live="polite"></p>
+          <div id="time-picker-options" class="time-picker-options"></div>
+        </div>
+        <p id="offer-window-note" class="offer-window-note"></p>
+      </section>
+      <section class="food-editor-section food-photo-section">
+        <h4><span>04</span> Make it look delicious <small>Optional</small></h4>
+        <div class="photo-upload-box"><label for="m-image">Food photo or poster</label><p>JPG, PNG, or WebP · Up to 5 MB</p><input type="file" id="m-image" accept="image/jpeg,image/png,image/webp" onchange="previewFoodImage()"><img id="m-image-preview" class="item-image-preview" alt="Food item preview" hidden></div>
+      </section>
+      <p class="food-editor-tip">After saving, enter today's quantity in <strong>Manage Listings</strong>.</p>
+      <div id="listing-feedback" class="form-error" role="alert" hidden></div>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Category</label>
-        <input id="m-category" list="food-categories" required>
-        <datalist id="food-categories">
-          <option value="Bakery"><option value="Restaurant meal"><option value="Main Meal">
-          <option value="Groceries"><option value="Cafe"><option value="Produce">
-        </datalist>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Original Price (৳)</label>
-        <input type="number" id="m-orig-price" placeholder="450" min="0" step="0.01" required>
-      </div>
-      <div class="form-group">
-        <label>Rescue Price (৳)</label>
-        <input type="number" id="m-rescue-price" placeholder="180" min="0" step="0.01" required>
-      </div>
-    </div>
-    <div class="form-group"><label>Description</label><textarea id="m-description" rows="2"></textarea></div>
-    <div class="form-row">
-      <div class="form-group"><label>Daily offer starts (Bangladesh time)</label><input type="time" id="m-start" required></div>
-      <div class="form-group"><label>Daily offer ends (Bangladesh time)</label><input type="time" id="m-end" required></div>
-    </div>
-    <div class="form-group">
-      <label for="m-image">Food photo or poster (JPG, PNG, WebP; max 5 MB)</label>
-      <input type="file" id="m-image" accept="image/jpeg,image/png,image/webp" onchange="previewFoodImage()">
-      <img id="m-image-preview" class="item-image-preview" alt="Food item preview" hidden>
-    </div>
-    <p class="profile-muted">After saving, set today's quantity in Manage Listings. An earlier end time closes after midnight; matching start and end times mean a 24-hour offer.</p>
-    <div id="listing-feedback" class="form-error" role="alert" hidden></div>
-    <div class="form-actions modal-actions">
-      <button class="btn-sec" onclick="closeModal('new-listing-modal')">Cancel</button>
-      <button class="btn-pri" id="listing-submit-btn" onclick="submitNewListing()">Save Food Item</button>
-    </div>
+    <footer class="food-editor-footer">
+      <button class="btn-sec" type="button" onclick="closeModal('new-listing-modal')">Cancel</button>
+      <button class="btn-pri" type="button" id="listing-submit-btn" onclick="submitNewListing()">Save Food Item</button>
+    </footer>
   </div>
 </div>
 
@@ -418,36 +503,79 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="listing-detail-modal">
-  <div class="modal">
-    <h3 id="detail-title"></h3>
-    <div id="detail-body"></div>
-    <div class="modal-actions">
-      <button class="btn-sec" onclick="closeModal('listing-detail-modal')">Close</button>
-      <button class="btn-pri" id="detail-reserve">Reserve</button>
+<div class="modal-overlay" id="listing-detail-modal" onclick="if(event.target===this) closeModal(this.id)">
+  <div class="modal meal-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+    <button class="detail-close" id="detail-close" type="button" aria-label="Close meal details" onclick="closeModal('listing-detail-modal')">&times;</button>
+    <div class="detail-media" id="detail-media"></div>
+    <div class="detail-content">
+      <p class="detail-eyebrow" id="detail-category"></p>
+      <h3 id="detail-title"></h3>
+      <div id="detail-body"></div>
+      <form id="detail-form" onsubmit="reserveDetail(event)">
+        <div class="detail-portions">
+          <div><label for="detail-quantity">How many portions?</label><p id="detail-stock"></p></div>
+          <div class="portion-stepper">
+            <button id="detail-minus" type="button" aria-label="Remove one portion" onclick="stepDetailQuantity(-1)">&minus;</button>
+            <input id="detail-quantity" aria-describedby="detail-stock" type="number" inputmode="numeric" min="1" step="1" value="1" required oninput="updateDetailQuantity()">
+            <button id="detail-plus" type="button" aria-label="Add one portion" onclick="stepDetailQuantity(1)">+</button>
+          </div>
+        </div>
+        <p id="detail-feedback" class="detail-feedback" role="alert"></p>
+        <div class="detail-checkout">
+          <div><span>Total to pay at pickup</span><strong id="detail-total"></strong></div>
+          <button class="btn-pri" id="detail-reserve" type="submit">Add to reservation</button>
+        </div>
+        <p class="detail-note">Review your cart and confirm to reserve. Pay when you collect your food.</p>
+      </form>
     </div>
   </div>
 </div>
 
-<!-- Modal: Checkout Order -->
-<div class="modal-overlay" id="checkout-modal">
-  <div class="modal">
-    <h3>Complete Food Rescue Order</h3>
-    <p style="font-size: 13px; color: var(--ink-soft);">You are reserving items from active local restaurant listings.</p>
-    <div id="checkout-summary" style="margin: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0;"></div>
-    <div class="form-group">
-      <label>Payment Method</label>
-      <select id="pay-method">
-        <option>Pay at pickup</option>
-      </select>
+<!-- Cart: opened explicitly from the navigation -->
+<div class="modal-overlay cart-overlay" id="checkout-modal" onclick="if(event.target===this) closeModal(this.id)">
+  <section class="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title">
+    <header class="cart-header">
+      <div class="cart-heading-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 7h14l1 14H4L5 7Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></svg></div>
+      <div><p class="cart-eyebrow">Good food, less waste</p><h2 id="cart-title">Your cart <span id="cart-portion-count">0</span></h2></div>
+      <button id="cart-close" class="cart-close" type="button" aria-label="Close cart" onclick="closeModal('checkout-modal')">&times;</button>
+    </header>
+    <div class="cart-scroll">
+      <div class="cart-section-heading"><span id="cart-item-summary">Your selected meals</span><button id="cart-clear" type="button" onclick="clearCart()">Clear cart</button></div>
+      <div id="checkout-summary" class="cart-summary"></div>
+      <div class="cart-pickup-note" id="cart-pickup-note"><span aria-hidden="true">&#10003;</span><p><strong>Collect directly from the restaurant</strong><br>Your pickup code appears in your orders after confirmation.</p></div>
     </div>
-    <div class="modal-actions">
-      <button class="btn-sec" onclick="closeModal('checkout-modal')">Cancel</button>
-      <button class="btn-pri" onclick="confirmOrder()">Confirm Reservation</button>
-    </div>
-  </div>
+    <footer class="cart-footer">
+      <div class="cart-payment"><label for="pay-method">Payment</label><select id="pay-method"><option>Pay at pickup</option></select></div>
+      <div class="cart-total"><div><span>Total to pay</span><small>At the restaurant when you collect</small></div><strong id="cart-grand-total">৳0.00</strong></div>
+      <p id="cart-feedback" role="status"></p>
+      <button class="btn-pri" id="cart-confirm" onclick="confirmOrder()">Confirm Reservation</button>
+      <button class="cart-continue" type="button" onclick="closeModal('checkout-modal')">Continue browsing</button>
+    </footer>
+  </section>
+</div>
+<div id="cart-toast" class="cart-toast" hidden>
+  <span class="cart-toast-check" aria-hidden="true">&#10003;</span><span id="cart-toast-message" role="status" aria-live="polite"></span>
+  <button type="button" onclick="openCheckoutModal()">View cart</button><button class="cart-toast-dismiss" type="button" aria-label="Dismiss cart message" onclick="document.getElementById('cart-toast').hidden=true">&times;</button>
 </div>
 
+<datalist id="city-options"></datalist>
+<div class="modal-overlay" id="notifications-modal" onclick="if(event.target===this) closeModal(this.id)">
+  <div class="modal notification-dialog" role="dialog" aria-modal="true" aria-labelledby="notifications-title">
+    <div class="notification-heading"><h3 id="notifications-title">Your notifications</h3><button class="btn-sec" aria-label="Close notifications" onclick="closeModal('notifications-modal')">&times;</button></div>
+    <p class="profile-muted">Order updates appear here while PlateUp is open.</p>
+    <button class="review-order-btn" onclick="markNotificationsRead()">Mark all as read</button>
+    <div id="notifications-list" aria-live="polite"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="pickup-modal">
+  <form class="modal" role="dialog" aria-modal="true" aria-labelledby="pickup-title" onsubmit="verifyPickup(event)">
+    <h3 id="pickup-title">Verify pickup</h3>
+    <p id="pickup-context" class="profile-muted"></p>
+    <div class="form-group"><label for="pickup-code-input">Customer's pickup code</label><input id="pickup-code-input" required maxlength="30" autocomplete="off" placeholder="Ask the customer for their code"></div>
+    <p id="pickup-feedback" class="detail-feedback" role="alert"></p>
+    <div class="modal-actions"><button type="button" class="btn-sec" onclick="closeModal('pickup-modal')">Cancel</button><button id="pickup-submit" class="btn-pri" type="submit">Verify & complete pickup</button></div>
+  </form>
+</div>
 <script src="assets/js/app.js"></script>
 </body>
 </html>

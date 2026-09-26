@@ -30,15 +30,21 @@ The app is designed around a simple pickup-based marketplace model:
 - Set original and rescue prices
 - Define offer start and end times
 - Upload food images
+- Choose a saved food category from a dropdown, or use Add Category to save a new shared choice
+- Price spinner arrows adjust by ৳1; the offer-time picker saves automatically after selecting hour, minute, and AM/PM
 - Manage daily availability and remaining stock
 - Track business orders from pending to completed
 - View sales summaries and business analytics
 
 ### Customer features
-- Search and browse active listings
+- Search and browse active listings from restaurants matching your selected city; customer and business profiles use a shared city catalog
+- Open View Restaurants beside the marketplace search to browse registered kitchens, search by name/city, and open a restaurant's profile and menu
+- Search in restaurant by meal name, description, or category, then use View details to choose portions and add them to the cart
 - Filter by category
-- View item details and pickup information
-- Reserve food based on daily availability
+- View meal photos, pickup information, and five-star item ratings based on actual reviews
+- Choose portions with a live price total, then confirm the reservation in your cart
+- Change cart quantities, remove meals, or clear the cart; current prices and stock are checked before confirmation
+- Show the pickup code from your order to the restaurant at collection
 - Cancel eligible orders
 - Leave reviews for completed orders
 
@@ -53,6 +59,17 @@ The app is designed around a simple pickup-based marketplace model:
 - Customers can create, edit, and delete reviews for completed orders
 - Business owners can reply to reviews
 - Reviews are tied to real orders and listings
+- Item cards and details show the average and review count; unreviewed items show five empty stars
+
+Customers and restaurants select a city from the searchable profile suggestions. The shared catalog starts with 20 cities and preserves previously saved locations. Common aliases such as Chittagong/Chattogram resolve to the same city ID. Unrecognized new entries are rejected; expand the `cities` catalog to support additional locations. Guests and accounts without a saved city see a prompt instead of a food feed. City matching applies to the feed, item details, cart checks, and new reservations. Changing your customer city clears the cart but keeps existing orders.
+
+The restaurant directory includes all active registered business accounts, including kitchens without available meals. Public restaurant profiles contain their name, description, pickup address/city, business hours, and review ratings. Restaurant menus show only currently active, in-stock meals matching the viewer's saved city. Guests can explore the directory and profiles, then sign in to browse local meals. The directory and menu refresh every 30 seconds while visible.
+
+### Pickup verification and notifications
+- Customer orders show a unique pickup code until completed or cancelled. Business APIs never return the code.
+- Businesses move orders to confirmed and ready, then enter the customer's code to complete pickup. Five incorrect attempts pause verification for five minutes.
+- In-app notifications alert businesses to new/cancelled reservations and customers to confirmed, ready, and completed orders. The Updates button shows unread counts and offers individual or bulk mark-as-read actions.
+- Notifications and order status refresh every 15 seconds while the app is visible. They are stored in PostgreSQL; email, SMS, and background push notifications are not included.
 
 ## Tech stack
 
@@ -134,6 +151,14 @@ npm run db:migrate
 ```
 
 This script initializes the required schema and can be rerun safely to update the database without dropping existing data when applicable.
+
+The latest additive migration (`server/migrations/002-city-pickup-notifications.sql`) adds `cities`, profile city foreign keys, pickup verification fields, and `notifications`. The runner backfills codes only for existing open orders that have none, preserving codes on reruns. Restart the backend after running the migration.
+
+Additional APIs: `GET /api/cities`, `POST /api/cart/quote`, `GET /api/notifications`, `PATCH /api/notifications/:id/read`, and `PATCH /api/notifications/read` (with `through_id`). Completing an order through `PATCH /api/orders/:id` requires `pickup_code`; checkout supplies `unit_price` for each item so a price change returns a conflict for customer review.
+
+Restaurant APIs: `GET /api/restaurants` returns public business profiles; `GET /api/restaurants/:id` returns `{ restaurant, listings }`. The latter applies the existing city and availability rules to `listings`. Neither endpoint returns authentication or private account fields. No additional migration is needed for restaurant browsing.
+
+Category APIs: `GET /api/categories` lists the saved category catalog; `POST /api/categories` (business accounts only) adds `{ name }`. Names are unique ignoring case, and listing create/edit rejects categories outside the catalog. Run `npm run db:migrate` to apply `003-food-categories.sql`, which preserves existing listing categories and seeds the standard choices without changing listing data. Existing prices with decimals remain supported; only the form's arrow increment changes to one taka.
 
 ## Running the app
 
