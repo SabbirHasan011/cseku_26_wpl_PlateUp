@@ -7,6 +7,9 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const pool = require('./db');
+const { expireOrders,expireLockedOrder } = require('./order-lifecycle');
+const { registerAccountSecurity } = require('./account-security');
+const { registerCustomerExperience } = require('./customer-experience');
 require('dotenv').config();
 
 const app = express();
@@ -106,8 +109,8 @@ function auth(req, res, next) {
   if (!token) return res.status(401).json({ message: 'Sign in required' });
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    pool.query('SELECT role,status FROM users WHERE id=$1', [decoded.userId]).then(result => {
-      if (!result.rows.length || result.rows[0].status !== 'active' || result.rows[0].role !== decoded.role)
+    pool.query('SELECT role,status,auth_version FROM users WHERE id=$1', [decoded.userId]).then(result => {
+      if (!result.rows.length || result.rows[0].status !== 'active' || result.rows[0].role !== decoded.role || result.rows[0].auth_version!==(decoded.version||0))
         return res.status(401).json({ message: 'Account unavailable' });
       req.user = decoded;
       next();
@@ -118,6 +121,8 @@ function auth(req, res, next) {
 const role = name => (req, res, next) => req.user.role === name ? next()
   : res.status(403).json({ message: 'This account cannot perform that action' });
 const optionalAuth = (req,res,next) => req.get('Authorization') ? auth(req,res,next) : next();
+registerAccountSecurity(app,{auth,wrap});
+registerCustomerExperience(app,{auth,role,wrap,validId,listingSql,restaurantSql,viewerCitySql});
 function publicOrder(order,user) {
   const { pickup_code,pickup_attempts,pickup_locked_until,...safe } = order;
   if (user.role==='customer' && user.userId===order.customer_id && ['pending','confirmed','ready'].includes(order.status))
@@ -199,7 +204,7 @@ app.post('/api/auth/login', wrap(async (req, res) => {
   const user = result.rows[0];
   if (!user || !await bcrypt.compare(password,user.password_hash))
     return res.status(401).json({ message: 'Invalid credentials' });
-  const token = jwt.sign({ userId:user.id,email:user.email,role:user.role },process.env.JWT_SECRET,{ expiresIn:'1h' });
+  const token = jwt.sign({ userId:user.id,email:user.email,role:user.role,version:user.auth_version },process.env.JWT_SECRET,{ expiresIn:'1h' });
   res.json({ token,user:{ id:user.id,name:user.name,email:user.email,role:user.role } });
 }));
 
@@ -408,12 +413,13 @@ app.put('/api/listings/:id/today', auth, role('business'), wrap(async (req,res) 
 app.post('/api/cart/quote',auth,role('customer'),wrap(async (req,res)=>{
   const input=cartInput(req.body);
   if (!input) return res.status(400).json({ message:'Choose valid listings and positive quantities.' });
-  const found=await pool.query(`SELECT * FROM (${listingSql}) items WHERE id=ANY($2::int[])
+  const found=await pool.query(`SELECT *,available_until AT TIME ZONE 'Asia/Dhaka' AS pickup_deadline FROM (${listingSql}) items WHERE id=ANY($2::int[])
     AND is_active=TRUE AND daily_status='Active' AND city_id=${viewerCitySql}`,
     [req.user.userId,input.map(item=>item.listing_id)]);
   const items=input.map(requested=>{
     const item=found.rows.find(row=>row.id===requested.listing_id);
     return { listing_id:requested.listing_id,quantity:requested.quantity,title:item?.title,
+      business_name:item?.business_name,image_path:item?.image_path,pickup_deadline:item?.pickup_deadline,
       unit_price:item?Number(item.rescue_price):null,available_quantity:item?.quantity||0,
       total_price:item?Number((Number(item.rescue_price)*requested.quantity).toFixed(2)):0,
       error:!item?'No longer available in your city.':requested.quantity>item.quantity?
@@ -445,17 +451,19 @@ app.post('/api/orders', auth, role('customer'), wrap(async (req,res) => {
         AND a.remaining_quantity>=$1
         AND plateup_daily_status(a.offer_date,a.remaining_quantity,l.offer_start_time,
           l.offer_end_time,CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')='Active'
-        RETURNING a.id,l.rescue_price,l.business_id,l.title`,[quantity,listingId,req.user.userId,unit_price]);
+        RETURNING a.id,l.rescue_price,l.business_id,l.title,
+          (a.offer_date+l.offer_end_time+CASE WHEN l.offer_end_time<=l.offer_start_time THEN INTERVAL '1 day' ELSE INTERVAL '0 day' END)
+          AT TIME ZONE 'Asia/Dhaka' AS pickup_deadline`,[quantity,listingId,req.user.userId,unit_price]);
       if (!stock.rows.length) {
         await db.query('ROLLBACK');
         return res.status(409).json({ message:'An item has changed price, is outside your saved city, or no longer has enough stock. Review your cart and try again.' });
       }
       const total = Number(stock.rows[0].rescue_price)*quantity;
       const created = await db.query(`INSERT INTO orders
-        (customer_id,listing_id,daily_availability_id,quantity,total_price,payment_method)
-        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        (customer_id,listing_id,daily_availability_id,quantity,total_price,payment_method,pickup_deadline)
+        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
         [req.user.userId,listingId,stock.rows[0].id,quantity,total,
-          clean(req.body.payment_method,50)||'Pay at pickup']);
+          clean(req.body.payment_method,50)||'Pay at pickup',stock.rows[0].pickup_deadline]);
       const order=created.rows[0];
       const code=order.id+'-'+crypto.randomBytes(3).toString('hex').toUpperCase();
       await db.query('UPDATE orders SET pickup_code=$1 WHERE id=$2',[code,order.id]);
@@ -469,6 +477,7 @@ app.post('/api/orders', auth, role('customer'), wrap(async (req,res) => {
   finally { db.release(); }
 }));
 app.get('/api/orders', auth, wrap(async (req,res) => {
+  await expireOrders(req.user);
   const condition = req.user.role==='customer'?'o.customer_id=$1':'l.business_id=$1';
   const result = await pool.query(`${orderSql} WHERE ${condition} ORDER BY o.id DESC`,[req.user.userId]);
   res.set('Cache-Control','private, no-store');
@@ -485,9 +494,16 @@ app.patch('/api/orders/:id', auth, wrap(async (req,res) => {
     const customer=req.user.role==='customer'&&order.customer_id===req.user.userId;
     const business=req.user.role==='business'&&order.business_id===req.user.userId;
     if (!customer&&!business) { await db.query('ROLLBACK'); return res.status(403).json({ message:'Order does not belong to this account' }); }
+    if (['pending','confirmed','ready'].includes(order.status) && order.pickup_deadline && new Date(order.pickup_deadline)<=new Date()) {
+      await expireLockedOrder(db,order); await db.query('COMMIT');
+      return res.status(409).json({message:'The pickup deadline has passed. This reservation has expired.'});
+    }
     const next=req.body.status;
+    const rejection=business && next==='rejected' && ['pending','confirmed','ready'].includes(order.status);
+    const reason=clean(req.body.reason,500);
+    if (rejection && !reason) { await db.query('ROLLBACK'); return res.status(400).json({message:'Enter a reason for rejecting this reservation.'}); }
     const allowed=customer?['pending','confirmed'].includes(order.status)&&next==='cancelled'
-      :({ pending:'confirmed',confirmed:'ready',ready:'completed' })[order.status]===next;
+      :rejection || ({ pending:'confirmed',confirmed:'ready',ready:'completed' })[order.status]===next;
     if (!allowed) { await db.query('ROLLBACK'); return res.status(400).json({ message:'Invalid order status change' }); }
     if (next==='completed') {
       const locked=order.pickup_locked_until && new Date(order.pickup_locked_until).getTime()>Date.now();
@@ -501,12 +517,12 @@ app.patch('/api/orders/:id', auth, wrap(async (req,res) => {
         return res.status(400).json({ message:'Incorrect pickup code. Ask the customer for the code shown in their order.' });
       }
     }
-    const updated=await db.query(`UPDATE orders SET status=$1::varchar,updated_at=NOW(),
+    const updated=await db.query(`UPDATE orders SET status=$1::varchar,updated_at=NOW(),status_reason=$3,
       pickup_time=CASE WHEN $1::varchar='completed' THEN NOW() ELSE pickup_time END,
       pickup_attempts=0,pickup_locked_until=NULL,
       payment_status=CASE WHEN $1::varchar='completed' AND payment_method='Pay at pickup' THEN 'paid'
-      ELSE payment_status END WHERE id=$2 RETURNING *`,[next,order.id]);
-    if (next==='cancelled' && order.daily_availability_id) await db.query(`UPDATE daily_availability
+      ELSE payment_status END WHERE id=$2 RETURNING *`,[next,order.id,rejection?reason:null]);
+    if (['cancelled','rejected'].includes(next) && order.daily_availability_id) await db.query(`UPDATE daily_availability
       SET remaining_quantity=remaining_quantity+$1,updated_at=NOW() WHERE id=$2`,
       [order.quantity,order.daily_availability_id]);
     if (next==='completed') await db.query(`INSERT INTO sales_data
@@ -514,7 +530,7 @@ app.patch('/api/orders/:id', auth, wrap(async (req,res) => {
       ON CONFLICT (order_id) DO NOTHING`,
       [order.business_id,order.listing_id,order.id,order.quantity,order.total_price]);
     await notifyOrder(db,customer?order.business_id:order.customer_id,order.id,next,
-      'Reservation #'+order.id+' for '+order.listing_title+' is '+(next==='ready'?'ready for pickup':next)+'.');
+      'Reservation #'+order.id+' for '+order.listing_title+' is '+(next==='ready'?'ready for pickup':next)+'.'+(rejection?' Reason: '+reason:''));
     await db.query('COMMIT');
     res.json({ order:publicOrder(updated.rows[0],req.user) });
   } catch(error) { await db.query('ROLLBACK'); throw error; }
@@ -522,6 +538,7 @@ app.patch('/api/orders/:id', auth, wrap(async (req,res) => {
 }));
 
 app.get('/api/notifications',auth,wrap(async (req,res)=>{
+  await expireOrders(req.user);
   const [items,unread]=await Promise.all([
     pool.query('SELECT id,order_id,event,message,read_at,created_at FROM notifications WHERE user_id=$1 ORDER BY id DESC LIMIT 50',[req.user.userId]),
     pool.query('SELECT COUNT(*)::int AS count FROM notifications WHERE user_id=$1 AND read_at IS NULL',[req.user.userId])

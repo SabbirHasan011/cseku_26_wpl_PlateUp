@@ -5,13 +5,13 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 // Exercise the actual UI functions without starting the app's network/timer bootstrap.
-function frontend() {
+function frontend(storage=new Map()) {
   const nodes = new Map(), events = new Map();
   const document = { activeElement:null,body:{ classList:classes() },
     getElementById(id) {
       if (!nodes.has(id)) nodes.set(id,{ value:'',textContent:'',innerHTML:'',disabled:false,
         hidden:false,isConnected:true,classList:classes(),setAttribute() {},
-        focus() { document.activeElement=this; },querySelectorAll() { return []; } });
+        reset() {},focus() { document.activeElement=this; },querySelectorAll() { return []; } });
       return nodes.get(id);
     },
     querySelectorAll() { return []; },
@@ -29,11 +29,12 @@ function frontend() {
   const calls = [], alerts = [];
   const categories=[{ id:1,name:'Bakery' },{ id:2,name:'Main Meal' }];
   const context = vm.createContext({ document,location:{ protocol:'http:',port:'5000' },
-    localStorage:{ getItem() { return null; },setItem() {},removeItem() {} },
+    localStorage:{ getItem(key) { return storage.get(key)||null; },setItem(key,value) {storage.set(key,value);},removeItem(key) {storage.delete(key);} },
     FormData,URL,console,alert:message=>alerts.push(message),setTimeout:()=>1,clearTimeout() {},
     fetch:async (url,options)=>{
       calls.push({ url,options });
       let result={ listing:item };
+      if (url==='/api/favorites') result={saved:[],restaurants:[],listings:[]};
       if (url==='/api/categories') {
         if (options.method==='POST') {
           const category={ id:categories.length+1,name:JSON.parse(options.body).name };
@@ -57,10 +58,11 @@ function frontend() {
   const source = fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
   const bootstrap = source.lastIndexOf('\nrenderTopNav();\nloadInitialData();');
   assert.ok(bootstrap>0);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../assets/js/experience.js'),'utf8'),context);
   vm.runInContext(source.slice(0,bootstrap),context);
   vm.runInContext(`currentUser={id:1,name:'Customer',role:'customer'};
     profile={customer_city:'Dhaka'}; listings=[${JSON.stringify(item)}];`,context);
-  return { context,document,events,calls,alerts,item,run:code=>vm.runInContext(code,context),node:document.getElementById };
+  return { context,document,events,calls,alerts,item,storage,run:code=>vm.runInContext(code,context),node:document.getElementById };
 }
 
 test('adding selected portions keeps checkout closed until the customer opens the cart',async ()=>{
@@ -336,4 +338,87 @@ test('notification inbox displays unread counts and persists read actions',async
   await ui.context.refreshNotifications(); await ui.context.markNotificationsRead();
   assert.equal(JSON.parse(actions[1].body).through_id,9);
   assert.equal(ui.node('notification-count').textContent,0);
+});
+
+test('saved carts survive reload, validate prices and stock, and stay isolated by account and city',async()=>{
+  const storage=new Map(), first=frontend(storage);
+  first.run('profile.customer_city_id=1');
+  first.context.addToCart(17,2);
+  assert.equal(JSON.parse(storage.get('plateup_cart_1')).items[0].quantity,2);
+  const reload=frontend(storage);reload.run('profile.customer_city_id=1');
+  reload.item.rescue_price=175;
+  await reload.context.restoreCart();
+  assert.equal(reload.run('cartItems.length'),2);
+  assert.equal(reload.run('cartItems[0].price'),175);
+  assert.equal(reload.node('cart-confirm').disabled,false);
+  assert.match(reload.node('cart-feedback').textContent,/Prices have changed/);
+  const unavailable=frontend(storage);unavailable.run('profile.customer_city_id=1');unavailable.item.quantity=0;
+  await unavailable.context.restoreCart();
+  assert.equal(unavailable.node('cart-confirm').disabled,true);
+  assert.match(unavailable.node('cart-feedback').textContent,/unavailable/);
+  const other=frontend(storage);other.run('currentUser.id=2; profile.customer_city_id=1');
+  await other.context.restoreCart();assert.equal(other.run('cartItems.length'),0);
+  const moved=frontend(storage);moved.run('profile.customer_city_id=2');
+  await moved.context.restoreCart();assert.equal(moved.run('cartItems.length'),0);
+  const corrupt=frontend(new Map([['plateup_cart_1','not-json']]));
+  await corrupt.context.restoreCart();assert.equal(corrupt.run('cartItems.length'),0);
+});
+
+test('marketplace category buttons come from the saved catalog and escape category text',async()=>{
+  const ui=frontend();
+  ui.context.fetch=async()=>({ok:true,headers:{get:()=> 'application/json'},json:async()=>[{id:1,name:'Desserts <special>'},{id:2,name:'Main Meal'}]});
+  await ui.context.loadMarketplaceCategories();
+  assert.match(ui.node('marketplace-categories').innerHTML,/Desserts &lt;special&gt;/);
+  assert.match(ui.node('marketplace-categories').innerHTML,/data-category=/);
+  ui.run("activeCategory='Removed category'");await ui.context.loadMarketplaceCategories();
+  assert.equal(ui.run('activeCategory'),'All');
+});
+
+test('My Orders shows progress, deadlines, terminal reasons, and only eligible actions',()=>{
+  const ui=frontend();
+  ui.run(`orders=[{id:1,listing_title:'Bread',business_name:'Bakery',quantity:2,total_price:100,status:'ready',pickup_code:'1-ABCDEF',pickup_deadline:'2026-09-26T18:00:00Z'},
+    {id:2,listing_title:'Rice',business_name:'Kitchen',quantity:1,total_price:80,status:'completed'},
+    {id:3,listing_title:'Salad',business_name:'Kitchen',quantity:1,total_price:60,status:'rejected',status_reason:'Closed <today>'}]`);
+  ui.context.setOrderTab('active');
+  assert.match(ui.node('my-orders-list').innerHTML,/order-timeline/);
+  assert.match(ui.node('my-orders-list').innerHTML,/1-ABCDEF/);
+  assert.match(ui.node('my-orders-list').innerHTML,/Pickup by/);
+  assert.doesNotMatch(ui.node('my-orders-list').innerHTML,/Cancel reservation|Review meal/);
+  ui.context.setOrderTab('completed');assert.match(ui.node('my-orders-list').innerHTML,/Review meal/);
+  ui.context.setOrderTab('history');assert.match(ui.node('my-orders-list').innerHTML,/Closed &lt;today&gt;/);
+  assert.doesNotMatch(ui.node('my-orders-list').innerHTML,/pickup-code|Cancel reservation/);
+});
+
+test('favorites distinguish available meals from saved unavailable items',()=>{
+  const ui=frontend();
+  ui.run(`favorites={saved:[{listing_id:17,title:'Meal'},{business_id:42,title:'Kitchen'}],restaurants:[{id:42,business_name:'Kitchen',city:'Dhaka'}],listings:[]}`);
+  ui.context.renderFavorites();
+  assert.match(ui.node('favorite-restaurants').innerHTML,/openRestaurant\(42\)/);
+  assert.match(ui.node('unavailable-favorites').innerHTML,/Currently unavailable/);
+  assert.doesNotMatch(ui.node('unavailable-favorites').innerHTML,/openListingDetails/);
+  assert.match(ui.context.favoriteButton('listing',17),/aria-pressed="true"/);
+});
+
+test('reset links are removed from the address and password forms send the expected secure requests',async()=>{
+  const ui=frontend();
+  const resetToken='a'.repeat(64), replaced=[];
+  Object.assign(ui.context.location,{hash:'#reset='+resetToken,pathname:'/',search:''});
+  ui.context.history={replaceState:(...args)=>replaced.push(args)};
+  assert.equal(ui.context.captureResetLink(),true);
+  assert.equal(replaced[0][2],'/');assert.equal(ui.run('activeScreen'),'reset-password');
+  ui.node('reset-new').value='NewPassword123!';ui.node('reset-confirm').value='different';
+  await ui.context.resetPassword({preventDefault(){}});
+  assert.match(ui.node('reset-feedback').textContent,/do not match/);
+  ui.context.fetch=async(url,options)=>{
+    ui.calls.push({url,options});return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({message:'Password reset.'})};
+  };
+  ui.run('handleLogout=()=>{}; refreshMarketplace=async()=>{};');
+  ui.node('reset-confirm').value='NewPassword123!';
+  await ui.context.resetPassword({preventDefault(){}});
+  assert.deepEqual(JSON.parse(ui.calls.find(call=>call.url==='/api/auth/reset-password').options.body),{token:resetToken,new_password:'NewPassword123!'});
+  assert.equal(ui.run('resetPasswordToken'),null);
+  assert.equal(ui.run('activeScreen'),'login');
+  ui.node('recovery-email').value='customer@example.test';
+  await ui.context.requestPasswordReset({preventDefault(){}});
+  assert.deepEqual(JSON.parse(ui.calls.find(call=>call.url==='/api/auth/forgot-password').options.body),{email:'customer@example.test'});
 });
