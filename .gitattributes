@@ -1,0 +1,2 @@
+# Git hooks use a shell shebang, including on Git for Windows.
+/.githooks/* text eol=lf
