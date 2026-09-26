@@ -466,6 +466,7 @@
   .cart-line h3 { font: 700 15px var(--font-body); line-height: 1.4; margin: 4px 0 0; overflow-wrap: anywhere; }
   .cart-unit-price { margin: 8px 0 12px; font: 600 12px var(--font-mono); color: var(--green-900); }
   .cart-unit-price span { font: 400 11px var(--font-body); color: var(--ink-soft); }
+  .cart-pickup-deadline { color: var(--green-700); font-size: 10px; line-height: 1.5; margin: -5px 0 10px; }
   .cart-line-controls { flex-wrap: wrap; }
   .cart-stepper { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
   .cart-stepper button { width: 30px; height: 32px; padding: 0; border: 0; background: var(--green-50); color: var(--green-900); font-size: 18px; cursor: pointer; }
@@ -581,6 +582,50 @@
   .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
   .btn-sec { background: var(--paper); border: 1px solid var(--line); padding: 10px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; }
   .btn-pri { background: var(--green-900); color: #fff; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+
+  .top-controls .switch { flex-wrap: wrap; }
+  .favorite-btn { border: 1px solid var(--line); background: var(--paper); color: var(--green-700); border-radius: 999px; padding: 7px 13px; cursor: pointer; font: 600 12px var(--font-body); margin-top: 10px; }
+  .favorite-btn.saved { color: var(--coral-700); background: var(--coral-100); border-color: #E8B8AE; }
+  .saved-restaurant, .unavailable-favorite { display: flex; align-items: center; gap: 16px; padding: 18px; border: 1px solid var(--line); background: white; border-radius: 14px; margin-bottom: 12px; }
+  .saved-restaurant > div { flex: 1; }
+  .saved-restaurant h3 { margin: 0 0 6px; font: 700 21px var(--font-display); color: var(--green-900); }
+  .saved-restaurant p { margin: 0; font-size: 12px; color: var(--ink-soft); }
+  .saved-restaurant .favorite-btn, .unavailable-favorite .favorite-btn { margin: 0; }
+  .unavailable-favorite { justify-content: space-between; font-size: 13px; color: var(--ink-soft); }
+  .order-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .order-tabs button { border: 1px solid var(--line); background: white; padding: 10px 18px; border-radius: 999px; color: var(--green-900); cursor: pointer; font-weight: 600; }
+  .order-tabs button.active { background: var(--green-900); color: white; border-color: var(--green-900); }
+  #my-orders-status, #favorites-status, #analytics-feedback { color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
+  .customer-orders-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+  .customer-order-card { min-width: 0; padding: 24px; background: white; border: 1px solid var(--line); border-radius: 20px; }
+  .order-card-heading { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; }
+  .order-card-heading h3 { margin: 8px 0; font: 700 22px var(--font-display); color: var(--green-900); overflow-wrap: anywhere; }
+  .order-card-heading small, .order-card-heading span { color: var(--ink-soft); font-size: 12px; }
+  .order-card-heading > strong { white-space: nowrap; font: 700 17px var(--font-mono); color: var(--green-900); }
+  .order-timeline { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; list-style: none; padding: 0; margin: 24px 0 20px; }
+  .order-timeline li { padding-top: 10px; border-top: 4px solid var(--line); color: var(--ink-soft); font-size: 10px; }
+  .order-timeline li.reached { border-color: var(--green-600); color: var(--green-900); font-weight: 700; }
+  .order-pickup-details { background: var(--green-50); padding: 12px; border-radius: 10px; }
+  .order-pickup-details p { font-size: 12px; line-height: 1.6; margin: 0 0 4px; overflow-wrap: anywhere; }
+  .order-state { font-size: 12px; color: var(--ink-soft); text-transform: capitalize; overflow-wrap: anywhere; }
+  .analytics-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .analytics-filters label { font-size: 12px; color: var(--ink-soft); }
+  .analytics-filters input { display: block; padding: 9px; border: 1px solid var(--line); border-radius: 8px; margin-top: 5px; font: inherit; }
+  .analytics-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 20px 0; }
+  .analytics-summary > div { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--green-50); }
+  .analytics-summary span { display: block; font-size: 11px; color: var(--ink-soft); margin-bottom: 8px; }
+  .analytics-summary strong { font: 700 24px var(--font-mono); color: var(--green-900); overflow-wrap: anywhere; }
+  .table-scroll { overflow-x: auto; margin: 20px 0 28px; }
+  .table-scroll table { min-width: 650px; }
+  .password-recovery-link { display: block; margin: 14px auto 0; border: 0; background: transparent; color: var(--green-700); text-decoration: underline; font-size: 12px; cursor: pointer; }
+  #recovery-feedback, #reset-feedback, #password-change-feedback { font-size: 13px; line-height: 1.6; color: var(--green-700); }
+  #recovery h2, #reset-password h2 { color: var(--green-900); font-family: var(--font-display); }
+  @media(max-width: 760px) { .customer-orders-grid { grid-template-columns: 1fr; } }
+  @media(max-width: 560px) {
+    .saved-restaurant, .unavailable-favorite { flex-wrap: wrap; }
+    .analytics-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .customer-order-card { padding: 18px; }
+  }
 
   /* Persistent food item editor */
   #new-listing-modal { padding: 16px; background: rgba(13,31,22,0.62); backdrop-filter: blur(4px); }

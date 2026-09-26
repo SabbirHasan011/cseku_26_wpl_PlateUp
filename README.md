@@ -44,6 +44,9 @@ The app is designed around a simple pickup-based marketplace model:
 - View meal photos, pickup information, and five-star item ratings based on actual reviews
 - Choose portions with a live price total, then confirm the reservation in your cart
 - Change cart quantities, remove meals, or clear the cart; current prices and stock are checked before confirmation
+- Keep a separate cart per customer on the same browser across refreshes and sign-ins; restoring it rechecks current availability and prices
+- Use My Orders for active, completed, and cancelled/missed reservations, pickup deadlines, progress, and reviews
+- Save favorite meals and restaurants; unavailable favorites remain removable but cannot be purchased
 - Show the pickup code from your order to the restaurant at collection
 - Cancel eligible orders
 - Leave reviews for completed orders
@@ -54,6 +57,12 @@ The app is designed around a simple pickup-based marketplace model:
 - Quantity validation to prevent over-ordering
 - Order status transitions such as pending, confirmed, ready, and completed
 - Sales history recording when an order is completed
+- Businesses can reject an open reservation with a required reason; rejection returns portions to the original daily inventory
+- Reservations have a fixed pickup deadline captured from the daily offer end, including midnight-crossing windows
+
+Overdue pending/confirmed/ready reservations become `expired` when orders, order actions, notifications, or the business daily report are requested. No background job is required: while PlateUp is open, its existing polling triggers these checks. Both parties receive an in-app expiry notification. Stock is restored once to the original daily record; a closed offer remains unpurchasable. Historical orders without a linked daily record have no inferred deadline. Later edits to a food item's time window do not change an existing reservation's deadline.
+
+The Sales & Predictions tab includes a daily report with date filters and CSV export. It counts offered portions, portions awaiting pickup, collected portions, remaining/unreserved portions, missed-pickup portions, and collected revenue, grouped by the daily offer date in Bangladesh time. The remaining figure becomes leftover stock once the offer closes. Missed portions are a subset of uncollected food, not an additional inventory quantity. Reports support up to 366 days per request.
 
 ### Reviews
 - Customers can create, edit, and delete reviews for completed orders
@@ -113,7 +122,7 @@ The AI/ML prediction features described in the broader project vision are not im
 
 Before running the app, make sure you have:
 
-- Node.js installed
+- Node.js 20 or newer (the email library requires it; use a current LTS release)
 - PostgreSQL running locally or on a server
 - A database created for PlateUp
 - A `.env` file with required environment variables
@@ -131,6 +140,12 @@ DB_PORT=5432
 JWT_SECRET=your_secure_jwt_secret
 PORT=5000
 ```
+
+See `.env.example` for all configuration keys. To enable real password-reset email, set `APP_ORIGIN`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `MAIL_FROM`. Port 587 uses STARTTLS (`SMTP_SECURE=false`); port 465 uses TLS (`SMTP_SECURE=true`). TLS certificate verification stays enabled. Set `APP_ORIGIN` to the public HTTPS address when deployed. Restart the server after changing environment variables.
+
+Customers and businesses can change their password from their profile by entering the current password. The sign-in page also has Forgot password. Recovery emails contain a single-use link that expires after 30 minutes; only a hash of its token is stored in PostgreSQL. Reset tokens are kept in the URL fragment, removed from the address after reading, and never returned by the API or logged. Changing/resetting a password invalidates existing login sessions and reset links. Recovery requests return the same response for known and unknown emails, have a one-minute per-account cooldown, and security endpoints have a per-process IP rate limit (10 attempts per route per 15 minutes). A shared rate-limit store would be needed for multiple server instances.
+
+Without SMTP settings, password changes work but Forgot password reports that email recovery is not configured. Tests use a captured email sender and do not send real email. Email delivery through your provider must be checked after configuration.
 
 Important:
 - Do not commit the `.env` file.
@@ -152,13 +167,21 @@ npm run db:migrate
 
 This script initializes the required schema and can be rerun safely to update the database without dropping existing data when applicable.
 
-The latest additive migration (`server/migrations/002-city-pickup-notifications.sql`) adds `cities`, profile city foreign keys, pickup verification fields, and `notifications`. The runner backfills codes only for existing open orders that have none, preserving codes on reruns. Restart the backend after running the migration.
+Migration `002-city-pickup-notifications.sql` adds `cities`, profile city foreign keys, pickup verification fields, and `notifications`. The runner backfills codes only for existing open orders that have none, preserving codes on reruns. Migration `004-customer-experience.sql` adds favorites, password-reset records, account session versions, pickup deadlines/reasons, and the `rejected`/`expired` order statuses. It backfills deadlines for reservations with daily inventory records and preserves already saved deadlines on reruns. Restart the backend after running the migration.
 
 Additional APIs: `GET /api/cities`, `POST /api/cart/quote`, `GET /api/notifications`, `PATCH /api/notifications/:id/read`, and `PATCH /api/notifications/read` (with `through_id`). Completing an order through `PATCH /api/orders/:id` requires `pickup_code`; checkout supplies `unit_price` for each item so a price change returns a conflict for customer review.
 
 Restaurant APIs: `GET /api/restaurants` returns public business profiles; `GET /api/restaurants/:id` returns `{ restaurant, listings }`. The latter applies the existing city and availability rules to `listings`. Neither endpoint returns authentication or private account fields. No additional migration is needed for restaurant browsing.
 
 Category APIs: `GET /api/categories` lists the saved category catalog; `POST /api/categories` (business accounts only) adds `{ name }`. Names are unique ignoring case, and listing create/edit rejects categories outside the catalog. Run `npm run db:migrate` to apply `003-food-categories.sql`, which preserves existing listing categories and seeds the standard choices without changing listing data. Existing prices with decimals remain supported; only the form's arrow increment changes to one taka.
+
+Customer experience APIs:
+
+- `GET /api/favorites`, `PUT /api/favorites/:kind/:id`, `DELETE /api/favorites/:kind/:id` (`kind` is `listing` or `business`; customer authentication required).
+- `GET /api/business/analytics/daily?from=YYYY-MM-DD&to=YYYY-MM-DD`, optionally `&format=csv`; business authentication required.
+- `PATCH /api/orders/:id` accepts `{ status: "rejected", reason: "..." }` from the owning business.
+- `POST /api/auth/change-password` with `{ current_password, new_password }` and authentication.
+- `POST /api/auth/forgot-password` with `{ email }`; `POST /api/auth/reset-password` with `{ token, new_password }`.
 
 ## Running the app
 
@@ -183,6 +206,8 @@ npm test
 ```
 
 The test suite validates marketplace workflows such as registration, login, listing management, order creation, status updates, inventory logic, and review behavior.
+
+It also tests cart restoration and account/city isolation, catalog-driven filters, order timelines, favorites ownership/availability, concurrent expiry, rejection inventory, daily totals/CSV, and password reset expiry/reuse/session invalidation. Database integration tests create disposable accounts and clean their data afterward. No frontend build or lint command is configured; the frontend runs directly as HTML/CSS/JavaScript.
 
 ## Main workflows implemented
 

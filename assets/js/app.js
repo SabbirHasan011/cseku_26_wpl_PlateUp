@@ -133,7 +133,7 @@ async function fetchListings() {
 
 async function refreshMarketplace() {
   el('listing-status').textContent = 'Refreshing listings…';
-  try { await fetchListings(); }
+  try { await Promise.all([fetchListings(),loadMarketplaceCategories()]); }
   catch (error) {
     console.error(error);
     el('listing-status').textContent = 'Could not refresh listings: ' + error.message;
@@ -142,7 +142,7 @@ async function refreshMarketplace() {
 
 async function loadInitialData() {
   try {
-    await Promise.all([fetchListings(), requestJson('/reviews').then(data => { reviews = data; })]);
+    await Promise.all([fetchListings(),loadMarketplaceCategories(), requestJson('/reviews').then(data => { reviews = data; })]);
     renderReviews();
     renderHomeReviews();
   } catch (error) { console.error(error); alert('Could not load marketplace data: ' + error.message); }
@@ -157,8 +157,10 @@ async function loadAccount(throwOnFailure = false) {
     currentUser = { id:profile.id, name:profile.name, email:profile.email, role:profile.role };
     renderTopNav();
     if (currentUser.role === 'customer') {
+      await restoreCart();
       orders = await requestJson('/orders');
       renderProfile();
+      await loadFavorites();
     } else {
       await loadBusiness();
     }
@@ -267,6 +269,9 @@ async function handleSignup(event) {
   } catch (error) { showAuthError(error.message); }
 }
 function handleLogout() {
+  persistCart(); restoredCartOwner=null; favoriteRequest++;
+  favorites={saved:[],restaurants:[],listings:[]};
+  closeModal('password-change-modal'); closeModal('reject-order-modal');
   token = null; currentUser = null; profile = null; orders = []; businessOrders = [];
   businessListings = []; cartItems = [];
   restaurants=[]; selectedRestaurantId=null; selectedRestaurant=null; restaurantListings=[];
@@ -289,6 +294,7 @@ function renderTopNav() {
     '" aria-current="' + (navScreen === screen ? 'page' : 'false') +
     '" onclick="showScreen(\'' + screen + '\')">' + label + '</button>';
   const nav = '<div class="switch">' + navButton('home','Home') + navButton('customer','Browse Food') +
+    (currentUser?.role === 'customer' ? navButton('my-orders','My Orders') + navButton('favorites','Favorites') : '') +
     (currentUser?.role === 'business' ? navButton('business','Business Portal') : '') + '</div>';
   controls.innerHTML = nav + (currentUser
     ? (currentUser.role === 'customer' ? '<button id="cart-open" class="cart-chip" onclick="openCheckoutModal()">Cart (<span id="cart-count">' +
@@ -301,6 +307,8 @@ function renderTopNav() {
     : '<button class="btn-pri" onclick="showScreen(\'login\')">Sign In</button>');
 }
 function showScreen(screen) {
+  if (['my-orders','favorites'].includes(screen) && currentUser?.role!=='customer') screen='login';
+  if (screen==='reset-password' && !resetPasswordToken) screen='recovery';
   if (screen === 'restaurant' && !selectedRestaurantId) screen = 'restaurants';
   if (screen==='profile' && currentUser?.role==='business') {
     showScreen('business'); switchBizTab('profile',el('business-profile-nav')); return;
@@ -317,6 +325,8 @@ function showScreen(screen) {
   if (screen === 'home' || screen === 'customer') refreshMarketplace();
   if (screen === 'restaurants') loadRestaurants();
   if (screen === 'restaurant') loadRestaurant();
+  if (screen === 'my-orders') loadMyOrders();
+  if (screen === 'favorites') loadFavorites();
 }
 
 async function loadRestaurants() {
@@ -367,7 +377,7 @@ async function loadRestaurant() {
       escapeHtml(item.business_name)+'</h1>'+itemRating(item)+'<p>'+escapeHtml(item.description||'Good food from a local kitchen. Browse today’s available rescue meals below.')+
       '</p><div class="restaurant-profile-meta"><span>'+escapeHtml([item.address,item.city].filter(Boolean).join(' · ')||'Pickup location not set')+'</span>'+
       (item.opening_time && item.closing_time ? '<span>Business hours: '+offerTime(item.opening_time)+' – '+offerTime(item.closing_time)+' · Bangladesh time</span>' : '')+
-      '</div></div><span class="restaurant-pickup-tag">Pickup at restaurant</span></div>';
+      '</div></div><div><span class="restaurant-pickup-tag">Pickup at restaurant</span><div id="restaurant-favorite">'+favoriteButton('business',item.id)+'</div></div></div>';
     renderRestaurantMenu();
     if (detailItem?.business_id===id && el('listing-detail-modal').classList.contains('active')) {
       detailItem=restaurantListings.find(item=>item.id===detailItem.id)||{ ...detailItem,quantity:0 };
@@ -401,7 +411,7 @@ function foodCard(item) {
     '</p>' + itemRating(item) + '<div class="food-meta">' + item.quantity + ' available · ' + escapeHtml(item.city || 'Pickup') +
     ' · Ends ' + offerTime(item.offer_end_time) + '</div><div class="ticket"><span class="orig-price">' + money(item.original_price) +
     '</span><span class="rescue-price">' + money(item.rescue_price) +
-    '</span></div><button class="reserve-btn" onclick="openListingDetails(' + item.id + ')">View details</button></div></div>';
+    '</span></div><button class="reserve-btn" onclick="openListingDetails(' + item.id + ')">View details</button>'+favoriteButton('listing',item.id)+'</div></div>';
 }
 
 function renderProfile() {
@@ -419,6 +429,7 @@ function renderProfile() {
   const completed = orders.filter(order => order.status === 'completed');
   el('profile-order-count').textContent = completed.length;
   el('profile-meal-count').textContent = completed.reduce((sum, order) => sum + order.quantity, 0);
+  renderMyOrders();
   el('order-history').innerHTML = orders.length ? orders.map(order => {
     const review = reviews.find(item => item.order_id === order.id);
     const action = ['pending','confirmed'].includes(order.status)
@@ -457,6 +468,7 @@ async function saveProfile(event) {
     }) });
     if (cityChanged) {
       cartItems = []; cartQuote=null; cartQuoteRequest++; listings = []; latestListingsRequest++;
+      persistCart();
       closeModal('listing-detail-modal'); closeModal('checkout-modal'); renderListings();
     }
     await loadAccount(); await fetchListings();
@@ -623,6 +635,7 @@ function addToCart(id,quantity = 1) {
   for (let i = 0; i < quantity; i++) cartItems.push({ listing_id:id,title:item.title,price:Number(item.rescue_price),
     image_path:item.image_path,business_name:item.business_name });
   cartQuote=null; cartQuoteRequest++;
+  persistCart();
   renderTopNav();
   return true;
 }
@@ -645,7 +658,9 @@ function renderCart() {
     return '<article class="cart-line">'+itemThumbnail(item)+'<div class="cart-line-body"><div class="cart-line-heading"><div><span class="cart-restaurant">'+
       escapeHtml(item.business_name||'Restaurant pickup')+'</span><h3>'+escapeHtml(item.title)+'</h3></div><button type="button" class="cart-remove" '+
       (orderSubmitting?'disabled':'')+' onclick="removeCartItem('+item.listing_id+')" aria-label="Remove '+escapeHtml(item.title)+'">&times;</button></div>'+
-      '<p class="cart-unit-price">'+money(item.price)+' <span>per portion</span></p><div class="cart-line-controls"><div class="cart-stepper">'+
+      '<p class="cart-unit-price">'+money(item.price)+' <span>per portion</span></p>'+
+      (quoted?.pickup_deadline?'<p class="cart-pickup-deadline">Pick up by '+pickupDate(quoted.pickup_deadline)+'</p>':'')+
+      '<div class="cart-line-controls"><div class="cart-stepper">'+
       '<button type="button" aria-label="Remove one portion of '+escapeHtml(item.title)+'" '+(orderSubmitting||item.quantity<=1?'disabled':'')+' onclick="stepCartQuantity('+item.listing_id+',-1)">&minus;</button>'+
       '<input id="cart-quantity-'+item.listing_id+'" aria-label="Portions of '+escapeHtml(item.title)+'" type="number" inputmode="numeric" min="1" max="100000" step="1" value="'+item.quantity+'" '+
       (orderSubmitting?'disabled':'')+' onchange="changeCartQuantity('+item.listing_id+',this.value)">'+
@@ -672,9 +687,12 @@ async function refreshCartQuote() {
       if (current?.unit_price!=null) {
         if (item.price!==current.unit_price) changed=true;
         item.price=current.unit_price;
+        item.title=current.title||item.title;
+        item.business_name=current.business_name||item.business_name;
+        item.image_path=current.image_path||item.image_path;
       }
     });
-    cartQuote=quote; renderCart();
+    cartQuote=quote; persistCart(); renderCart();
     el('cart-feedback').textContent=!quote.valid?'Update or remove unavailable items before confirming.':
       changed?'Prices have changed. Review the updated total before confirming.':'Prices and stock checked. Portions are reserved when you confirm.';
   } catch(error) {
@@ -691,7 +709,7 @@ function changeCartQuantity(id,value) {
   }
   cartItems=cartItems.filter(row=>row.listing_id!==id);
   for (let i=0;i<quantity;i++) cartItems.push({ ...item });
-  renderTopNav(); refreshCartQuote();
+  persistCart(); renderTopNav(); refreshCartQuote();
 }
 function stepCartQuantity(id,delta) {
   const item=groupedCart().find(row=>row.listing_id===id);
@@ -700,11 +718,11 @@ function stepCartQuantity(id,delta) {
 function removeCartItem(id) {
   if (orderSubmitting) return;
   cartItems=cartItems.filter(item=>item.listing_id!==id);
-  renderTopNav(); refreshCartQuote();
+  persistCart(); renderTopNav(); refreshCartQuote();
 }
 function clearCart() {
   if (orderSubmitting) return;
-  cartItems=[]; renderTopNav(); refreshCartQuote();
+  cartItems=[]; persistCart(); renderTopNav(); refreshCartQuote();
 }
 function openCheckoutModal() {
   cartReturnFocus=document.activeElement?.closest?.('#cart-toast') ? el('cart-open') : document.activeElement;
@@ -725,9 +743,10 @@ async function confirmOrder() {
       payment_method:el('pay-method').value
     }) });
     if (session!==token) return;
-    cartItems=[]; cartQuote=null; cartQuoteRequest++; closeModal('checkout-modal'); renderTopNav();
+    cartItems=[]; persistCart(); cartQuote=null; cartQuoteRequest++; closeModal('checkout-modal'); renderTopNav();
     orders=await requestJson('/orders'); await loadInitialData(); renderProfile(); await refreshNotifications();
-    alert('Reservation placed. Find your pickup code and order status in your profile.');
+    showScreen('my-orders');
+    alert('Reservation placed. Find your pickup code and deadline in My Orders.');
   } catch(error) {
     if (session!==token) return;
     await refreshCartQuote(); el('cart-feedback').textContent=error.message;
@@ -747,10 +766,12 @@ function renderBusinessOrders() {
     const next = ({ pending:'confirmed',confirmed:'ready',ready:'completed' })[order.status];
     return '<div class="order-row"><strong>#' + order.id + ' · ' + escapeHtml(order.listing_title) +
       '</strong><span>' + order.quantity + ' units · ' + money(order.total_price) +
-      '</span><span>' + escapeHtml(order.status) + '</span>' + (next==='completed'
+    '</span><span>' + escapeHtml(order.status) + '</span><small>Pickup by '+pickupDate(order.pickup_deadline)+'</small>'+
+      (order.status_reason?'<p>'+escapeHtml(order.status_reason)+'</p>':'') + (next==='completed'
         ? '<button class="review-order-btn" onclick="openPickupVerification('+order.id+')">Verify pickup</button>' : next
         ? '<button class="review-order-btn" onclick="changeOrder(' + order.id + ',\'' + next +
-          '\')">Mark ' + next + '</button>' : '') + '</div>';
+          '\')">Mark ' + next + '</button>' : '') +
+      (next?'<button class="review-order-btn danger-action" onclick="openRejectOrder('+order.id+')">Reject</button>':'')+'</div>';
   }).join('') : '<div class="empty-history">No reservations yet.</div>';
 }
 function openPickupVerification(id) {
@@ -811,7 +832,7 @@ async function openNotificationOrder(id) {
   if (!note) return;
   await markNotificationRead(id); closeModal('notifications-modal');
   if (currentUser?.role==='business') { showScreen('business'); switchBizTab('orders',document.querySelector('[data-biz-tab="orders"]')); }
-  else { await loadAccount(); showScreen('profile'); }
+  else { await loadAccount(); showScreen('my-orders'); }
 }
 async function refreshOrderActivity() {
   if (document.visibilityState==='hidden' || !token || !currentUser || activityRefreshing) return;
@@ -822,7 +843,7 @@ async function refreshOrderActivity() {
     const fresh=await requestJson('/orders');
     if (session!==token) return;
     if (currentUser.role==='business') { businessOrders=fresh; renderBusinessOrders(); }
-    else { orders=fresh; if (activeScreen==='profile' && !el('profile-form').contains(document.activeElement)) renderProfile(); }
+    else { orders=fresh; if(activeScreen==='my-orders')renderMyOrders(); if (activeScreen==='profile' && !el('profile-form').contains(document.activeElement)) renderProfile(); }
   } catch(error) { console.warn(error.message); }
   finally { activityRefreshing=false; }
 }
@@ -835,6 +856,7 @@ function switchBizTab(name, element) {
   });
   if (name === 'profile') renderProfile();
   if (name === 'listings') loadBusiness();
+  if (name === 'analytics') loadDailyAnalytics();
 }
 function openNewListingModal() {
   editingListingId=null;
@@ -913,6 +935,7 @@ async function saveFoodCategory() {
       toggleCategoryEditor(false);
       el('category-feedback').textContent='Category added and selected.';
       el('m-category').focus();
+      await loadMarketplaceCategories();
     }
   } catch(error) {
     if (version===listingEditorVersion && session===token) el('category-feedback').textContent=error.message;
@@ -1212,7 +1235,7 @@ function initHomeBanner() {
 
 document.addEventListener('keydown',event => {
   if (event.key==='Escape' && offerTimeDraft) { event.preventDefault(); closeOfferTimePicker(); return; }
-  const modalId=['checkout-modal','listing-detail-modal','new-listing-modal'].find(id=>el(id).classList.contains('active'));
+  const modalId=['password-change-modal','reject-order-modal','checkout-modal','listing-detail-modal','new-listing-modal'].find(id=>el(id).classList.contains('active'));
   if (!modalId) return;
   if (event.key === 'Escape') { event.preventDefault(); closeModal(modalId); }
   if (event.key === 'Tab') {
@@ -1227,8 +1250,9 @@ renderTopNav();
 loadInitialData();
 initHomeBanner();
 loadAccount().then(()=>{
+  if(captureResetLink())return;
   const savedScreen = localStorage.getItem('plateup_screen') || 'home';
-  const target = currentUser || ['home','customer','login','restaurants','restaurant'].includes(savedScreen) ? savedScreen : 'home';
+  const target = currentUser || ['home','customer','login','restaurants','restaurant','recovery'].includes(savedScreen) ? savedScreen : 'home';
   showScreen(target);
 });
 function refreshVisibleData() {
@@ -1237,6 +1261,7 @@ function refreshVisibleData() {
   if (activeScreen==='business') refreshBusinessListings();
   if (activeScreen==='restaurants') loadRestaurants();
   if (activeScreen==='restaurant') loadRestaurant();
+  if (activeScreen==='favorites') loadFavorites();
 }
 window.addEventListener('focus',refreshVisibleData);
 setInterval(refreshVisibleData,30000);

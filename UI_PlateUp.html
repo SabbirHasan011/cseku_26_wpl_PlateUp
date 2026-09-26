@@ -157,6 +157,7 @@
           <input type="password" id="login-pass" required>
         </div>
         <button type="submit" class="btn-submit">Sign In</button>
+        <button type="button" class="password-recovery-link" onclick="openForgotPassword()">Forgot password?</button>
       </form>
 
       <!-- SIGN UP FORM -->
@@ -203,7 +204,7 @@
     </div>
 
     <div class="filter-bar">
-      <div class="chip-row">
+      <div class="chip-row" id="marketplace-categories">
         <div class="chip on" onclick="filterCategory('All', this)">All</div>
         <div class="chip" onclick="filterCategory('Bakery', this)">Bakery</div>
         <div class="chip" onclick="filterCategory('Restaurant meal', this)">Restaurant meal</div>
@@ -253,6 +254,22 @@
     <div id="restaurant-menu-grid" class="grid"></div>
   </div>
 
+  <div id="my-orders" class="screen">
+    <div class="profile-header"><div><p class="profile-label">From kitchen to collection</p><h1>My Orders</h1><p>Track your meals and show your pickup code when you collect.</p></div><button class="btn-sec" onclick="loadMyOrders()">Refresh orders</button></div>
+    <div class="order-tabs"><button class="active" data-order-tab="active" onclick="setOrderTab('active')">Active</button><button data-order-tab="completed" onclick="setOrderTab('completed')">Completed</button><button data-order-tab="history" onclick="setOrderTab('history')">Cancelled & missed</button></div>
+    <p id="my-orders-status" role="status"></p><div id="my-orders-list" class="customer-orders-grid"></div>
+  </div>
+  <div id="favorites" class="screen">
+    <div class="profile-header"><div><p class="profile-label">Your go-to good food</p><h1>Favorites</h1></div><button class="btn-sec" onclick="showScreen('customer')">Browse meals</button></div>
+    <p id="favorites-status" role="status"></p><h2>Restaurants</h2><div id="favorite-restaurants"></div><h2>Meals available now</h2><div id="favorite-meals" class="grid"></div><div id="unavailable-favorites"></div>
+  </div>
+  <div id="recovery" class="screen">
+    <form class="auth-container" onsubmit="requestPasswordReset(event)"><h2>Forgot your password?</h2><p>Enter your account email to request a reset link.</p><div class="form-group"><label for="recovery-email">Email</label><input id="recovery-email" type="email" autocomplete="email" required></div><p id="recovery-feedback" role="status"></p><button id="recovery-submit" class="btn-pri">Send reset link</button><button class="btn-sec" type="button" onclick="showScreen('login')">Back to sign in</button></form>
+  </div>
+  <div id="reset-password" class="screen">
+    <form id="reset-form" class="auth-container" onsubmit="resetPassword(event)"><h2>Set a new password</h2><div class="form-group"><label for="reset-new">New password</label><input id="reset-new" type="password" autocomplete="new-password" minlength="8" required></div><div class="form-group"><label for="reset-confirm">Confirm password</label><input id="reset-confirm" type="password" autocomplete="new-password" minlength="8" required></div><p id="reset-feedback" role="status"></p><button id="reset-submit" class="btn-pri">Reset password</button><button type="button" class="btn-sec" onclick="openForgotPassword()">Request a new link</button></form>
+  </div>
+
   <!-- ============ PROFILE SCREEN ============ -->
   <div id="profile" class="screen">
     <div class="profile-header">
@@ -300,6 +317,7 @@
           <div class="form-group"><label>Preferred location</label><input id="profile-edit-location"></div>
         </div>
         <button class="btn-pri" type="submit">Save profile</button>
+        <button class="btn-sec" type="button" onclick="openPasswordChange()">Change password</button>
       </form>
     </section>
 
@@ -373,7 +391,11 @@
           <div id="business-orders" class="order-history"></div>
         </section>
         <section id="biz-tab-analytics" class="panel" style="display:none">
-          <h3>Completed sales</h3><div id="business-sales"></div>
+          <h3>Daily rescue report</h3>
+          <div class="analytics-filters"><label>From <input id="analytics-from" type="date"></label><label>To <input id="analytics-to" type="date"></label><button class="btn-pri" onclick="loadDailyAnalytics()">Apply dates</button><button class="btn-sec" onclick="exportDailyAnalytics()">Export CSV</button></div>
+          <p id="analytics-feedback" role="status"></p><div id="analytics-summary" class="analytics-summary"></div>
+          <div class="table-scroll"><table><thead><tr><th>Offer date</th><th>Offered</th><th>Awaiting pickup</th><th>Collected</th><th>Unreserved / left over</th><th>Missed</th><th>Revenue</th></tr></thead><tbody id="analytics-days"></tbody></table></div>
+          <h3>Recent completed sales · all dates</h3><div id="business-sales"></div>
           <h3>ML predictions</h3><p id="business-predictions">No predictions yet.</p>
         </section>
         <section id="biz-tab-profile" class="panel" style="display:none">
@@ -395,6 +417,7 @@
               <div class="form-group"><label>Longitude</label><input id="business-profile-lon" type="number" step="any" min="-180" max="180"></div>
             </div>
             <button class="btn-pri" type="submit">Save business profile</button>
+            <button class="btn-sec" type="button" onclick="openPasswordChange()">Change password</button>
           </form>
         </section>
 
@@ -576,6 +599,9 @@
     <div class="modal-actions"><button type="button" class="btn-sec" onclick="closeModal('pickup-modal')">Cancel</button><button id="pickup-submit" class="btn-pri" type="submit">Verify & complete pickup</button></div>
   </form>
 </div>
+<div class="modal-overlay" id="reject-order-modal"><form class="modal" onsubmit="rejectOrder(event)" role="dialog" aria-modal="true" aria-labelledby="reject-title"><h3 id="reject-title">Reject reservation</h3><p>The customer will receive your reason. Portions return to the original daily inventory.</p><div class="form-group"><label for="reject-reason">Reason</label><textarea id="reject-reason" maxlength="500" required placeholder="Explain why this reservation cannot be fulfilled"></textarea></div><p id="reject-feedback" class="detail-feedback" role="alert"></p><div class="modal-actions"><button type="button" class="btn-sec" onclick="closeModal('reject-order-modal')">Keep reservation</button><button id="reject-submit" class="btn-pri">Reject reservation</button></div></form></div>
+<div class="modal-overlay" id="password-change-modal"><form id="password-change-form" class="modal" onsubmit="changePassword(event)" role="dialog" aria-modal="true" aria-labelledby="password-change-title"><h3 id="password-change-title">Change password</h3><p>All sessions will be signed out after changing your password.</p><div class="form-group"><label for="password-current">Current password</label><input id="password-current" type="password" autocomplete="current-password" required></div><div class="form-group"><label for="password-new">New password</label><input id="password-new" type="password" autocomplete="new-password" minlength="8" required></div><div class="form-group"><label for="password-confirm">Confirm new password</label><input id="password-confirm" type="password" autocomplete="new-password" minlength="8" required></div><p id="password-change-feedback" role="status"></p><div class="modal-actions"><button type="button" class="btn-sec" onclick="closeModal('password-change-modal')">Cancel</button><button id="password-change-submit" class="btn-pri">Change password</button></div></form></div>
+<script src="assets/js/experience.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
 </html>
