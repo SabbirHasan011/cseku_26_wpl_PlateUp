@@ -1,6 +1,14 @@
-.env
+# Installed dependencies belong to this machine, not to a milestone branch.
 node_modules/
+
+# Local credentials; the placeholder template can be committed.
+.env
+.env.*
+!.env.example
+
+# Runtime uploads and generated output.
+server/uploads/
 coverage/
 dist/
 build/
-server/uploads/
+*.log

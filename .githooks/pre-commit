@@ -1,0 +1,15 @@
+#!/bin/sh
+# Check the index, including files added with git add -f or by a merge.
+blocked=$(git ls-files --cached -- \
+  ':(glob)**/node_modules/**' \
+  ':(glob)**/.env' ':(glob)**/.env.*' \
+  ':(exclude,glob)**/.env.example' \
+  'server/uploads/' 'coverage/' 'dist/' 'build/') || exit 1
+
+if [ -n "$blocked" ]; then
+  printf '%s\n' 'Commit blocked: local credentials or generated files are staged/tracked.' >&2
+  printf '%s\n' "$blocked" >&2
+  printf '%s\n' 'Unstage newly added files, or remove existing entries with git rm --cached.' >&2
+  printf '%s\n' 'Keep the local files. See docs/branch-switching.md.' >&2
+  exit 1
+fi

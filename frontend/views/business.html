@@ -1,0 +1,104 @@
+<div id="business" class="screen">
+    <div class="dash">
+
+      <div class="sidebar">
+        <div class="biz-id">
+          <div class="biz-avatar" id="biz-avatar-text">ST</div>
+          <div>
+            <div class="biz-name" id="biz-name-text">Spice Trail Kitchen</div>
+            <div class="biz-role" id="biz-role-text">ID: BIZ-9042</div>
+          </div>
+        </div>
+        <div class="navitem on" data-click="switchBizTab" data-arg0="overview">Overview</div>
+        <div class="navitem" data-biz-tab="listings" data-click="switchBizTab" data-arg0="listings">Manage Listings</div>
+        <div class="navitem" data-biz-tab="orders" data-click="switchBizTab" data-arg0="orders">Orders</div>
+        <div class="navitem" data-click="switchBizTab" data-arg0="analytics">Sales & Predictions</div>
+        <div class="navitem" data-click="switchBizTab" data-arg0="reviews">Customer Reviews</div>
+        <div class="navitem" id="business-profile-nav" data-click="switchBizTab" data-arg0="profile">Business Profile</div>
+        <button class="newlist-btn" data-click="openNewListingModal">+ Add Food Item</button>
+      </div>
+
+      <div>
+        <div id="business-feedback" class="form-success" role="status" hidden></div>
+        <div class="stat-row">
+          <div class="stat-card"><div class="stat-label">Active Listings</div><div class="stat-value" id="biz-active-count">0</div></div>
+          <div class="stat-card"><div class="stat-label">Meals Rescued</div><div class="stat-value" id="biz-meals-count">0</div></div>
+          <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value" id="biz-revenue">৳0</div></div>
+          <div class="stat-card"><div class="stat-label">Avg Rating</div><div class="stat-value" id="biz-avg-rating">N/A</div></div>
+        </div>
+
+        <!-- Section View: Main Dashboard Overview -->
+        <div id="biz-tab-overview">
+          <div class="ml-card">
+            <div>
+              <div class="label">Predictions</div>
+              <p class="headline">No predictions yet</p>
+              <div class="sub">Demand and pricing models have not been developed.</div>
+            </div>
+          </div>
+
+          <div class="panel manage-panel">
+            <div class="manage-panel-heading">
+              <div><p class="manage-eyebrow">Your daily menu</p><h3>Manage Listings <span id="business-item-count" class="manage-count">0</span></h3></div>
+              <button class="btn-pri" type="button" data-click="openNewListingModal">+ Add food item</button>
+            </div>
+            <p class="manage-panel-note">Your items, saved once. Just update today's portions. Offer times use Bangladesh time.</p>
+            <div id="business-listings" class="manage-listings"></div>
+          </div>
+
+        </div>
+
+        <section id="biz-tab-orders" class="panel" style="display:none">
+          <h3>Customer reservations</h3>
+          <div id="business-orders" class="order-history"></div>
+        </section>
+        <section id="biz-tab-analytics" class="panel" style="display:none">
+          <h3>Daily rescue report</h3>
+          <div class="analytics-filters"><label>From <input id="analytics-from" type="date"></label><label>To <input id="analytics-to" type="date"></label><button class="btn-pri" data-click="loadDailyAnalytics">Apply dates</button><button class="btn-sec" data-click="exportDailyAnalytics">Export CSV</button></div>
+          <p id="analytics-feedback" role="status"></p><div id="analytics-summary" class="analytics-summary"></div>
+          <div class="table-scroll"><table><thead><tr><th>Offer date</th><th>Offered</th><th>Awaiting pickup</th><th>Collected</th><th>Unreserved / left over</th><th>Missed</th><th>Revenue</th></tr></thead><tbody id="analytics-days"></tbody></table></div>
+          <h3>Recent completed sales · all dates</h3><div id="business-sales"></div>
+          <h3>ML predictions</h3><p id="business-predictions">No predictions yet.</p>
+        </section>
+        <section id="biz-tab-profile" class="panel" style="display:none">
+          <h3>Business profile</h3>
+          <form data-submit="saveBusinessProfile">
+            <div class="form-row">
+              <div class="form-group"><label>Business name</label><input id="business-profile-name" required></div>
+              <div class="form-group"><label>Phone</label><input id="business-profile-phone"></div>
+            </div>
+            <div class="form-group"><label>Description</label><textarea id="business-profile-description"></textarea></div>
+            <div class="form-group"><label>Pickup address</label><input id="business-profile-address"></div>
+            <div class="form-row">
+              <div class="form-group"><label for="business-profile-city">City</label><input id="business-profile-city" list="city-options" autocomplete="off" placeholder="Search and select a city"><small>Choose a suggested city so local customers can find you.</small></div>
+              <div class="form-group"><label>Opening time</label><input id="business-profile-open" type="time"></div>
+              <div class="form-group"><label>Closing time</label><input id="business-profile-close" type="time"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Latitude</label><input id="business-profile-lat" type="number" step="any" min="-90" max="90"></div>
+              <div class="form-group"><label>Longitude</label><input id="business-profile-lon" type="number" step="any" min="-180" max="180"></div>
+            </div>
+            <button class="btn-pri" type="submit">Save business profile</button>
+            <button class="btn-sec" type="button" data-click="openPasswordChange">Change password</button>
+          </form>
+        </section>
+
+        <!-- Section View: Customer Reviews -->
+        <div id="biz-tab-reviews" style="display: none;">
+          <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0;">Customer Feedback & Reviews</h3>
+              <div style="font-size: 13px; font-weight: 700; color: var(--green-900);" id="review-summary-tag">
+                <!-- Summary updated via JS -->
+              </div>
+            </div>
+            
+            <div id="reviews-feed">
+              <!-- Dynamic Reviews Injected Here -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>

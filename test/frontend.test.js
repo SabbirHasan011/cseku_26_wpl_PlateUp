@@ -3,24 +3,34 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { loadModules } = require('./helpers/frontend-modules.cjs');
 
 // Exercise the actual UI functions without starting the app's network/timer bootstrap.
-function frontend(storage=new Map()) {
+async function frontend(storage=new Map()) {
   const nodes = new Map(), events = new Map();
   const document = { activeElement:null,body:{ classList:classes() },
     getElementById(id) {
-      if (!nodes.has(id)) nodes.set(id,{ value:'',textContent:'',innerHTML:'',disabled:false,
-        hidden:false,isConnected:true,classList:classes(),setAttribute() {},
+      if (!nodes.has(id)) nodes.set(id,{ id,value:'',textContent:'',innerHTML:'',disabled:false,
+        hidden:false,isConnected:true,classList:classes(),setAttribute() {},appendChild() {},addEventListener() {},
         reset() {},focus() { document.activeElement=this; },querySelectorAll() { return []; } });
       return nodes.get(id);
     },
     querySelectorAll() { return []; },
     querySelector() { return null; },
-    addEventListener(name,handler) { events.set(name,handler); }
+    addEventListener(name,handler) { events.set(name,handler); },
+    createElement(tag) {
+      assert.equal(tag,'template');
+      return { set innerHTML(html) {
+        const first=/<(\w+)\b([^>]*)>/.exec(html);
+        const id=/\bid="([^"]+)"/.exec(first[2])?.[1];
+        this.content={ firstElementChild:document.getElementById(id || 'partial-root'),
+          querySelector:()=>null, querySelectorAll:()=>[] };
+      } };
+    }
   };
   function classes() {
     const set = new Set();
-    return { add:value=>set.add(value),remove:value=>set.delete(value),contains:value=>set.has(value) };
+    return { add:value=>set.add(value),remove:value=>set.delete(value),contains:value=>set.has(value),toggle:(value,on)=>on?set.add(value):set.delete(value) };
   }
   const item = { id:17,title:'Chicken biryani',category:'Main Meal',business_name:'Test Kitchen',
     city:'Dhaka',pickup_address:'12 Test Road',description:'With egg and salad',quantity:5,
@@ -30,10 +40,14 @@ function frontend(storage=new Map()) {
   const categories=[{ id:1,name:'Bakery' },{ id:2,name:'Main Meal' }];
   const context = vm.createContext({ document,location:{ protocol:'http:',port:'5000' },
     localStorage:{ getItem(key) { return storage.get(key)||null; },setItem(key,value) {storage.set(key,value);},removeItem(key) {storage.delete(key);} },
-    FormData,URL,console,alert:message=>alerts.push(message),setTimeout:()=>1,clearTimeout() {},
+    FormData,URL,console,alert:message=>alerts.push(message),setTimeout:()=>1,clearTimeout() {},setInterval:()=>1,clearInterval() {},
     fetch:async (url,options)=>{
+      if(url.startsWith('/frontend/')) return {ok:true,headers:{get:()=> 'text/html'},text:async()=>fs.readFileSync(path.join(__dirname,'..',url),'utf8')};
       calls.push({ url,options });
       let result={ listing:item };
+      if(url==='/api/listings') result=[item];
+      if(url==='/api/reviews') result=[];
+      if(url==='/api/notifications') result={notifications:[],unread_count:0};
       if (url==='/api/favorites') result={saved:[],restaurants:[],listings:[]};
       if (url==='/api/categories') {
         if (options.method==='POST') {
@@ -55,18 +69,15 @@ function frontend(storage=new Map()) {
       return { ok:true,headers:{ get:()=> 'application/json' },json:async ()=>result };
     }
   });
-  const source = fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
-  const bootstrap = source.lastIndexOf('\nrenderTopNav();\nloadInitialData();');
-  assert.ok(bootstrap>0);
-  vm.runInContext(fs.readFileSync(path.join(__dirname,'../assets/js/experience.js'),'utf8'),context);
-  vm.runInContext(source.slice(0,bootstrap),context);
+  await loadModules(context);
+  context.installDialogKeyboard();
   vm.runInContext(`currentUser={id:1,name:'Customer',role:'customer'};
     profile={customer_city:'Dhaka'}; listings=[${JSON.stringify(item)}];`,context);
   return { context,document,events,calls,alerts,item,storage,run:code=>vm.runInContext(code,context),node:document.getElementById };
 }
 
 test('adding selected portions keeps checkout closed until the customer opens the cart',async ()=>{
-  const ui=frontend();
+  const ui=await frontend();
   ui.node('open-button').focus();
   await ui.context.openListingDetails(17);
   assert.equal(ui.calls[0].url,'/api/listings/17');
@@ -121,8 +132,8 @@ test('adding selected portions keeps checkout closed until the customer opens th
   assert.equal(ui.document.body.classList.contains('meal-dialog-open'),false);
 });
 
-test('every rating shows five stars with fractional fill and an honest empty state',()=>{
-  const ui=frontend();
+test('every rating shows five stars with fractional fill and an honest empty state',async()=>{
+  const ui=await frontend();
   const rating=ui.context.itemRating(ui.item);
   assert.equal((rating.match(/class="rating-star"/g)||[]).length,5);
   assert.match(rating,/width:50%/);
@@ -140,7 +151,7 @@ test('every rating shows five stars with fractional fill and an honest empty sta
 });
 
 test('food editor loads saved categories, creates and selects one, and rejects unsaved categories',async ()=>{
-  const ui=frontend();
+  const ui=await frontend();
   await ui.context.openNewListingModal();
   assert.match(ui.node('m-category').innerHTML,/<option value="Bakery">Bakery<\/option>/);
   assert.equal(ui.node('m-category').value,'');
@@ -166,8 +177,8 @@ test('food editor loads saved categories, creates and selects one, and rejects u
   assert.match(ui.node('offer-window-note').textContent,/next day/);
 });
 
-test('time picker advances hour and minute then saves and closes on AM/PM, including midnight and noon',()=>{
-  const ui=frontend();
+test('time picker advances hour and minute then saves and closes on AM/PM, including midnight and noon',async()=>{
+  const ui=await frontend();
   ui.node('m-start').value='20:00'; ui.node('m-end').value='00:00';
   ui.context.openOfferTimePicker('m-start');
   ui.context.selectOfferTimePart('hour','12');
@@ -199,15 +210,15 @@ test('time picker advances hour and minute then saves and closes on AM/PM, inclu
 });
 
 test('restaurant directory, menu search and meal details connect to the cart without a loaded feed',async ()=>{
-  const ui=frontend();
+  const ui=await frontend();
   await ui.context.loadRestaurants();
   assert.match(ui.node('restaurant-grid').innerHTML,/Test Kitchen/);
-  assert.match(ui.node('restaurant-grid').innerHTML,/openRestaurant\(42\)/);
+  assert.match(ui.node('restaurant-grid').innerHTML,/data-click="openRestaurant" data-arg0="42"/);
   ui.node('restaurant-search').value='not a restaurant'; ui.context.renderRestaurants();
   assert.match(ui.node('restaurant-grid').innerHTML,/No restaurants match/);
   ui.node('restaurant-search').value='dhaka'; ui.context.renderRestaurants();
   assert.match(ui.node('restaurant-grid').innerHTML,/Test Kitchen/);
-  ui.context.openRestaurant(42);
+  await ui.context.openRestaurant(42);
   await ui.context.loadRestaurant();
   assert.equal(ui.run('activeScreen'),'restaurant');
   assert.match(ui.node('restaurant-profile').innerHTML,/Test Kitchen/);
@@ -215,7 +226,7 @@ test('restaurant directory, menu search and meal details connect to the cart wit
   ui.node('restaurant-food-search').value='bakery'; ui.context.renderRestaurantMenu();
   assert.match(ui.node('restaurant-menu-grid').innerHTML,/No meals match/);
   ui.node('restaurant-food-search').value='egg'; ui.context.renderRestaurantMenu();
-  assert.match(ui.node('restaurant-menu-grid').innerHTML,/openListingDetails\(17\)/);
+  assert.match(ui.node('restaurant-menu-grid').innerHTML,/data-click="openListingDetails" data-arg0="17"/);
   ui.run('listings=[]');
   await ui.context.openListingDetails(17);
   ui.context.stepDetailQuantity(1);
@@ -225,13 +236,13 @@ test('restaurant directory, menu search and meal details connect to the cart wit
   await ui.context.refreshCartQuote();
   assert.equal(ui.node('cart-confirm').disabled,false);
   assert.match(ui.node('checkout-summary').innerHTML,/Chicken biryani/);
-  ui.context.showScreen('restaurants');
+  await ui.context.showScreen('restaurants');
   assert.equal(ui.run('activeScreen'),'restaurants');
 });
 
 test('restaurant request failures remove stale meals and menus explain city restrictions',async ()=>{
-  const ui=frontend();
-  ui.context.openRestaurant(42); await ui.context.loadRestaurant();
+  const ui=await frontend();
+  await ui.context.openRestaurant(42); await ui.context.loadRestaurant();
   ui.run("restaurantListings=[]; selectedRestaurant.city='Khulna'");
   ui.context.renderRestaurantMenu();
   assert.match(ui.node('restaurant-menu-grid').innerHTML,/another city/);
@@ -245,7 +256,7 @@ test('restaurant request failures remove stale meals and menus explain city rest
 });
 
 test('cart quantities, current prices, removal and clearing stay connected to checkout',async ()=>{
-  const ui=frontend();
+  const ui=await frontend();
   ui.context.addToCart(17,2);
   await ui.context.refreshCartQuote();
   assert.equal(ui.node('cart-confirm').disabled,false);
@@ -269,7 +280,6 @@ test('cart quantities, current prices, removal and clearing stay connected to ch
   await ui.context.refreshCartQuote();
   assert.match(ui.node('cart-feedback').textContent,/Prices have changed/);
   assert.match(ui.node('checkout-summary').innerHTML,/350\.00/);
-  ui.run('loadInitialData=async()=>{}; renderProfile=()=>{}; refreshNotifications=async()=>{};');
   await ui.context.confirmOrder();
   const orderRequest=ui.calls.find(call=>call.url==='/api/orders' && call.options.method==='POST');
   assert.deepEqual(JSON.parse(orderRequest.options.body).items,[{ listing_id:17,quantity:2,unit_price:175 }]);
@@ -285,8 +295,8 @@ test('cart quantities, current prices, removal and clearing stay connected to ch
   assert.match(ui.node('cart-grand-total').textContent,/0\.00/);
 });
 
-test('city selection resolves aliases and rejects values outside the shared catalog',()=>{
-  const ui=frontend();
+test('city selection resolves aliases and rejects values outside the shared catalog',async()=>{
+  const ui=await frontend();
   ui.run("cities=[{id:1,name:'Chattogram',aliases:['chittagong']}]");
   ui.node('profile-edit-city').value=' CHITTAGONG ';
   assert.equal(ui.context.selectedCityId('profile-edit-city'),1);
@@ -298,7 +308,7 @@ test('city selection resolves aliases and rejects values outside the shared cata
 });
 
 test('missing routes on an old backend explain the restart needed instead of a connection failure',async ()=>{
-  const ui=frontend();
+  const ui=await frontend();
   ui.context.fetch=async ()=>({ status:404,ok:false,headers:{ get:()=> 'text/html' } });
   await assert.rejects(ui.context.requestJson('/cities'),/missing \/cities.*older backend.*Ctrl\+C/);
   ui.context.fetch=async ()=>({ status:200,ok:true,headers:{ get:()=> 'text/html' } });
@@ -306,8 +316,8 @@ test('missing routes on an old backend explain the restart needed instead of a c
 });
 
 test('pickup form sends the entered code and business orders do not offer unchecked completion',async ()=>{
-  const ui=frontend();
-  ui.run("businessOrders=[{id:31,status:'ready',listing_title:'Test meal',quantity:2,total_price:300}]; loadBusiness=async()=>{}; refreshNotifications=async()=>{};");
+  const ui=await frontend();
+  ui.run("businessOrders=[{id:31,status:'ready',listing_title:'Test meal',quantity:2,total_price:300}];");
   ui.context.renderBusinessOrders();
   assert.match(ui.node('business-orders').innerHTML,/Verify pickup/);
   assert.doesNotMatch(ui.node('business-orders').innerHTML,/Mark completed/);
@@ -320,7 +330,7 @@ test('pickup form sends the entered code and business orders do not offer unchec
 });
 
 test('notification inbox displays unread counts and persists read actions',async ()=>{
-  const ui=frontend();
+  const ui=await frontend();
   ui.run("token='customer-session'");
   const notes=[{ id:9,order_id:31,message:'Meal <ready>',event:'ready',created_at:'2026-09-25T12:00:00Z',read_at:null }];
   const actions=[];
@@ -341,31 +351,31 @@ test('notification inbox displays unread counts and persists read actions',async
 });
 
 test('saved carts survive reload, validate prices and stock, and stay isolated by account and city',async()=>{
-  const storage=new Map(), first=frontend(storage);
+  const storage=new Map(), first=await frontend(storage);
   first.run('profile.customer_city_id=1');
   first.context.addToCart(17,2);
   assert.equal(JSON.parse(storage.get('plateup_cart_1')).items[0].quantity,2);
-  const reload=frontend(storage);reload.run('profile.customer_city_id=1');
+  const reload=await frontend(storage);reload.run('profile.customer_city_id=1');
   reload.item.rescue_price=175;
   await reload.context.restoreCart();
   assert.equal(reload.run('cartItems.length'),2);
   assert.equal(reload.run('cartItems[0].price'),175);
   assert.equal(reload.node('cart-confirm').disabled,false);
   assert.match(reload.node('cart-feedback').textContent,/Prices have changed/);
-  const unavailable=frontend(storage);unavailable.run('profile.customer_city_id=1');unavailable.item.quantity=0;
+  const unavailable=await frontend(storage);unavailable.run('profile.customer_city_id=1');unavailable.item.quantity=0;
   await unavailable.context.restoreCart();
   assert.equal(unavailable.node('cart-confirm').disabled,true);
   assert.match(unavailable.node('cart-feedback').textContent,/unavailable/);
-  const other=frontend(storage);other.run('currentUser.id=2; profile.customer_city_id=1');
+  const other=await frontend(storage);other.run('currentUser.id=2; profile.customer_city_id=1');
   await other.context.restoreCart();assert.equal(other.run('cartItems.length'),0);
-  const moved=frontend(storage);moved.run('profile.customer_city_id=2');
+  const moved=await frontend(storage);moved.run('profile.customer_city_id=2');
   await moved.context.restoreCart();assert.equal(moved.run('cartItems.length'),0);
-  const corrupt=frontend(new Map([['plateup_cart_1','not-json']]));
+  const corrupt=await frontend(new Map([['plateup_cart_1','not-json']]));
   await corrupt.context.restoreCart();assert.equal(corrupt.run('cartItems.length'),0);
 });
 
 test('marketplace category buttons come from the saved catalog and escape category text',async()=>{
-  const ui=frontend();
+  const ui=await frontend();
   ui.context.fetch=async()=>({ok:true,headers:{get:()=> 'application/json'},json:async()=>[{id:1,name:'Desserts <special>'},{id:2,name:'Main Meal'}]});
   await ui.context.loadMarketplaceCategories();
   assert.match(ui.node('marketplace-categories').innerHTML,/Desserts &lt;special&gt;/);
@@ -374,8 +384,8 @@ test('marketplace category buttons come from the saved catalog and escape catego
   assert.equal(ui.run('activeCategory'),'All');
 });
 
-test('My Orders shows progress, deadlines, terminal reasons, and only eligible actions',()=>{
-  const ui=frontend();
+test('My Orders shows progress, deadlines, terminal reasons, and only eligible actions',async()=>{
+  const ui=await frontend();
   ui.run(`orders=[{id:1,listing_title:'Bread',business_name:'Bakery',quantity:2,total_price:100,status:'ready',pickup_code:'1-ABCDEF',pickup_deadline:'2026-09-26T18:00:00Z'},
     {id:2,listing_title:'Rice',business_name:'Kitchen',quantity:1,total_price:80,status:'completed'},
     {id:3,listing_title:'Salad',business_name:'Kitchen',quantity:1,total_price:60,status:'rejected',status_reason:'Closed <today>'}]`);
@@ -389,30 +399,31 @@ test('My Orders shows progress, deadlines, terminal reasons, and only eligible a
   assert.doesNotMatch(ui.node('my-orders-list').innerHTML,/pickup-code|Cancel reservation/);
 });
 
-test('favorites distinguish available meals from saved unavailable items',()=>{
-  const ui=frontend();
+test('favorites distinguish available meals from saved unavailable items',async()=>{
+  const ui=await frontend();
   ui.run(`favorites={saved:[{listing_id:17,title:'Meal'},{business_id:42,title:'Kitchen'}],restaurants:[{id:42,business_name:'Kitchen',city:'Dhaka'}],listings:[]}`);
   ui.context.renderFavorites();
-  assert.match(ui.node('favorite-restaurants').innerHTML,/openRestaurant\(42\)/);
+  assert.match(ui.node('favorite-restaurants').innerHTML,/data-click="openRestaurant" data-arg0="42"/);
   assert.match(ui.node('unavailable-favorites').innerHTML,/Currently unavailable/);
   assert.doesNotMatch(ui.node('unavailable-favorites').innerHTML,/openListingDetails/);
   assert.match(ui.context.favoriteButton('listing',17),/aria-pressed="true"/);
 });
 
 test('reset links are removed from the address and password forms send the expected secure requests',async()=>{
-  const ui=frontend();
+  const ui=await frontend();
   const resetToken='a'.repeat(64), replaced=[];
+  await ui.context.ensureView('login');
+  await ui.context.ensureView('home');
   Object.assign(ui.context.location,{hash:'#reset='+resetToken,pathname:'/',search:''});
   ui.context.history={replaceState:(...args)=>replaced.push(args)};
-  assert.equal(ui.context.captureResetLink(),true);
+  assert.equal(await ui.context.captureResetLink(),true);
   assert.equal(replaced[0][2],'/');assert.equal(ui.run('activeScreen'),'reset-password');
   ui.node('reset-new').value='NewPassword123!';ui.node('reset-confirm').value='different';
   await ui.context.resetPassword({preventDefault(){}});
   assert.match(ui.node('reset-feedback').textContent,/do not match/);
   ui.context.fetch=async(url,options)=>{
-    ui.calls.push({url,options});return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({message:'Password reset.'})};
+    ui.calls.push({url,options});return {ok:true,headers:{get:()=> 'application/json'},json:async()=>url.startsWith('/api/auth/')?{message:'Password reset.'}:[]};
   };
-  ui.run('handleLogout=()=>{}; refreshMarketplace=async()=>{};');
   ui.node('reset-confirm').value='NewPassword123!';
   await ui.context.resetPassword({preventDefault(){}});
   assert.deepEqual(JSON.parse(ui.calls.find(call=>call.url==='/api/auth/reset-password').options.body),{token:resetToken,new_password:'NewPassword123!'});

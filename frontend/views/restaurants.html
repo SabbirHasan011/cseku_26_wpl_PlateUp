@@ -1,0 +1,14 @@
+<div id="restaurants" class="screen">
+    <button class="restaurant-back" type="button" data-click="showScreen" data-arg0="customer">← Back to marketplace</button>
+    <div class="restaurant-directory-heading">
+      <div><p class="profile-label">Meet your local kitchens</p><h1>Good food starts here.</h1><p>Explore restaurants, cafés, bakeries, and food businesses on PlateUp.</p></div>
+      <span class="restaurant-heading-mark" aria-hidden="true">↗</span>
+    </div>
+    <div class="restaurant-search-bar">
+      <label for="restaurant-search">Find a restaurant</label>
+      <input id="restaurant-search" type="search" placeholder="Search restaurant or city…" data-input="renderRestaurants">
+      <button class="btn-sec" type="button" data-click="loadRestaurants">Refresh</button>
+    </div>
+    <p id="restaurant-directory-status" class="restaurant-results" role="status"></p>
+    <div id="restaurant-grid" class="restaurant-grid"></div>
+  </div>

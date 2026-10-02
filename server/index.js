@@ -16,10 +16,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
+const frontendDir = path.join(__dirname, '..', 'frontend');
+app.use('/frontend', express.static(frontendDir, { dotfiles: 'deny' }));
 const foodUploadDir = path.join(__dirname, 'uploads', 'food');
 app.use('/uploads/food', express.static(foodUploadDir, { fallthrough:false,
   setHeaders:res => res.setHeader('X-Content-Type-Options','nosniff') }));
-app.get('/', (_, res) => res.sendFile(path.join(__dirname, '..', 'UI_PlateUp.html')));
+app.get('/', (_, res) => res.sendFile(path.join(frontendDir, 'index.html')));
+app.get('/UI_PlateUp.html', (_, res) => res.redirect('/'));
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
 const clean = (value, max = 255) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const validId = value => Number.isSafeInteger(Number(value)) && Number(value) > 0;
