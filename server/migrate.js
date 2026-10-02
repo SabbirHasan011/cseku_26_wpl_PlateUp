@@ -15,6 +15,7 @@ async function main() {
     await client.query(fs.readFileSync(path.join(__dirname, 'migrations', '002-city-pickup-notifications.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(__dirname, 'migrations', '003-food-categories.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(__dirname, 'migrations', '004-customer-experience.sql'), 'utf8'));
+    await client.query(fs.readFileSync(path.join(__dirname, 'migrations', '005-training-data.sql'), 'utf8'));
     const pending = await client.query("SELECT id FROM orders WHERE pickup_code IS NULL AND status IN ('pending','confirmed','ready') FOR UPDATE");
     for (const order of pending.rows) {
       await client.query('UPDATE orders SET pickup_code=$1 WHERE id=$2',

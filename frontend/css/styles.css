@@ -1,3 +1,14 @@
+  .training-panel > p, .training-box p { color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
+  .training-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+  .training-sections { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,280px),1fr)); gap: 18px; margin-top: 22px; }
+  .training-box { padding: 18px; background: var(--green-50); border: 1px solid var(--line); border-radius: 14px; }
+  .training-box h4 { margin: 0 0 10px; color: var(--green-900); }
+  .training-box input[type="file"] { display: block; max-width: 100%; margin: 10px 0; }
+  .training-panel select { background: white; color: var(--ink); padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .training-panel td small { display: block; color: var(--ink-soft); margin-top: 4px; }
+  .training-summary { background: var(--green-100); border-radius: 10px; padding: 12px; font-weight: 600; }
+  #training-import-feedback { white-space: pre-line; overflow-wrap: anywhere; }
+  .training-note { padding: 12px; background: var(--amber-100); border-radius: 10px; }
   :root {
     --ink: #16241C;
     --ink-soft: #3E4A3F;

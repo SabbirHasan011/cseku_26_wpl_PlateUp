@@ -6,6 +6,7 @@ import { renderListings } from './marketplace.js';
 import { el, money, escapeHtml, date } from './ui.js';
 import { renderReviews } from './reviews.js';
 import { renderProfile } from './profile.js';
+import { loadTrainingData } from './training.js';
 
 export async function loadBusiness() {
   if (!state.currentUser || state.currentUser.role !== 'business') return;
@@ -52,12 +53,13 @@ export function switchBizTab(name, element) {
   el('biz-tab-overview').classList.toggle('listings-view',name === 'listings');
   document.querySelectorAll('.sidebar .navitem').forEach(item => item.classList.remove('on'));
   element?.classList.add('on');
-  ['overview','orders','analytics','reviews','profile'].forEach(tab => {
+  ['overview','orders','analytics','reviews','profile','training'].forEach(tab => {
     el('biz-tab-' + tab).style.display = tab === name || (name === 'listings' && tab === 'overview') ? 'block' : 'none';
   });
   if (name === 'profile') renderProfile();
   if (name === 'listings') loadBusiness();
   if (name === 'analytics') loadDailyAnalytics();
+  if (name === 'training') loadTrainingData();
 }
 
 export function analyticsQuery() {

@@ -10,6 +10,7 @@ const pool = require('./db');
 const { expireOrders,expireLockedOrder } = require('./order-lifecycle');
 const { registerAccountSecurity } = require('./account-security');
 const { registerCustomerExperience } = require('./customer-experience');
+const { registerTrainingData } = require('./training-data');
 require('dotenv').config();
 
 const app = express();
@@ -126,6 +127,7 @@ const role = name => (req, res, next) => req.user.role === name ? next()
 const optionalAuth = (req,res,next) => req.get('Authorization') ? auth(req,res,next) : next();
 registerAccountSecurity(app,{auth,wrap});
 registerCustomerExperience(app,{auth,role,wrap,validId,listingSql,restaurantSql,viewerCitySql});
+registerTrainingData(app,{auth,role,wrap});
 function publicOrder(order,user) {
   const { pickup_code,pickup_attempts,pickup_locked_until,...safe } = order;
   if (user.role==='customer' && user.userId===order.customer_id && ['pending','confirmed','ready'].includes(order.status))

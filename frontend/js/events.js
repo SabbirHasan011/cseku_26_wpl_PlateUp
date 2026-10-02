@@ -13,9 +13,17 @@ import { openRestaurant, renderRestaurantMenu, loadRestaurant, renderRestaurants
 import { openCitySettings, saveBusinessProfile, saveProfile } from './profile.js';
 import { switchBizTab, loadDailyAnalytics, exportDailyAnalytics } from './business.js';
 import { showHomeBanner, toggleHomeBannerPlayback } from './home.js';
+import { loadTrainingData, downloadTrainingFile, resetTrainingImport, importTrainingFile, generateTrainingSample, saveTrainingSample } from './training.js';
 
 // Only these explicit actions can be invoked from static or generated markup.
 export const actions = {
+  loadTrainingData: () => loadTrainingData(),
+  downloadTrainingFile: (event,node) => downloadTrainingFile(node.dataset.arg0),
+  resetTrainingImport: () => resetTrainingImport(),
+  validateTrainingFile: () => importTrainingFile(false),
+  importTrainingFile: () => importTrainingFile(true),
+  generateTrainingSample: () => generateTrainingSample(),
+  saveTrainingSample: () => saveTrainingSample(),
   closeModal: (event, node) => closeModal(node.dataset.arg0),
   toggleCategoryEditor: (event, node) => toggleCategoryEditor(),
   saveFoodCategory: (event, node) => saveFoodCategory(),

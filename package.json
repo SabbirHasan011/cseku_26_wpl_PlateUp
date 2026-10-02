@@ -7,6 +7,7 @@
     "start": "node server/index.js",
     "dev": "node server/index.js",
     "db:migrate": "node server/migrate.js",
+    "data:generate": "node tools/generate-training-data.js",
     "test": "node --experimental-vm-modules --test --test-isolation=none"
   },
   "keywords": [

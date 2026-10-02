@@ -13,6 +13,7 @@
         <div class="navitem" data-biz-tab="listings" data-click="switchBizTab" data-arg0="listings">Manage Listings</div>
         <div class="navitem" data-biz-tab="orders" data-click="switchBizTab" data-arg0="orders">Orders</div>
         <div class="navitem" data-click="switchBizTab" data-arg0="analytics">Sales & Predictions</div>
+        <div class="navitem" data-click="switchBizTab" data-arg0="training">Data preparation</div>
         <div class="navitem" data-click="switchBizTab" data-arg0="reviews">Customer Reviews</div>
         <div class="navitem" id="business-profile-nav" data-click="switchBizTab" data-arg0="profile">Business Profile</div>
         <button class="newlist-btn" data-click="openNewListingModal">+ Add Food Item</button>
@@ -59,6 +60,44 @@
           <div class="table-scroll"><table><thead><tr><th>Offer date</th><th>Offered</th><th>Awaiting pickup</th><th>Collected</th><th>Unreserved / left over</th><th>Missed</th><th>Revenue</th></tr></thead><tbody id="analytics-days"></tbody></table></div>
           <h3>Recent completed sales · all dates</h3><div id="business-sales"></div>
           <h3>ML predictions</h3><p id="business-predictions">No predictions yet.</p>
+        </section>
+        <section id="biz-tab-training" class="panel training-panel" style="display:none">
+          <p class="profile-label">Prepare reliable pricing history</p>
+          <h3>Offer data &amp; sample datasets</h3>
+          <p>Daily offer details are captured when quantity is first entered. Price, stock and reservation events are recorded as they happen.</p>
+          <div class="analytics-filters">
+            <label for="training-source">Source <select id="training-source" data-change="loadTrainingData"><option value="platform">PlateUp history</option><option value="restaurant">Imported restaurant records</option><option value="synthetic">Synthetic samples</option></select></label>
+            <label for="training-from">From <input id="training-from" type="date"></label>
+            <label for="training-to">To <input id="training-to" type="date"></label>
+            <button class="btn-pri" type="button" data-click="loadTrainingData">Check data</button>
+          </div>
+          <p id="training-summary" class="training-summary"></p>
+          <p id="training-feedback" role="status"></p>
+          <div class="training-buttons">
+            <button class="btn-sec" type="button" data-click="downloadTrainingFile" data-arg0="dataset">Export eligible offers</button>
+            <button class="btn-sec" type="button" data-click="downloadTrainingFile" data-arg0="events">Export PlateUp price &amp; stock events</button>
+            <button class="btn-sec" type="button" data-click="downloadTrainingFile" data-arg0="template">Download import template</button>
+          </div>
+          <div class="table-scroll"><table><thead><tr><th>Offer date</th><th>Food item</th><th>Offered</th><th>Collected</th><th>History quality</th><th>Data checks</th></tr></thead><tbody id="training-rows"></tbody></table></div>
+          <p class="training-note">Older offers have estimated details and are excluded from training exports. Offers with changing prices or quantities need event-level analysis and are flagged in the daily dataset.</p>
+          <div class="training-sections">
+            <section class="training-box">
+              <h4>Import restaurant history</h4>
+              <p>Use the template for ended PlateUp rescue offers. Validation checks quantities, prices, dates and duplicates before saving. Imported records stay separate from your marketplace and sales report.</p>
+              <label for="training-file">CSV file (UTF-8, up to 1 MB)</label>
+              <input id="training-file" type="file" accept=".csv,text/csv" data-change="resetTrainingImport">
+              <div class="training-buttons"><button id="training-validate" class="btn-sec" type="button" data-click="validateTrainingFile">Validate file</button><button id="training-import" class="btn-pri" type="button" data-click="importTrainingFile" disabled>Import validated file</button></div>
+              <p id="training-import-feedback" role="status"></p>
+            </section>
+            <section class="training-box">
+              <h4>Generate sample history</h4>
+              <p>Reproducible synthetic observations for development. These demonstrate data flow and do not establish real-world prediction accuracy.</p>
+              <div class="form-row"><div class="form-group"><label for="training-seed">Seed</label><input id="training-seed" type="number" min="0" max="4294967295" step="1" value="42"></div><div class="form-group"><label for="training-start">First offer date</label><input id="training-start" type="date" value="2025-01-01"></div></div>
+              <div class="form-row"><div class="form-group"><label for="training-days">Days (1–366)</label><input id="training-days" type="number" min="1" max="366" step="1" value="180"></div><div class="form-group"><label for="training-items">Items (1–10)</label><input id="training-items" type="number" min="1" max="10" step="1" value="5"></div></div>
+              <div class="training-buttons"><button id="training-generate" class="btn-sec" type="button" data-click="generateTrainingSample">Generate &amp; download CSV</button><button id="training-save-sample" class="btn-pri" type="button" data-click="saveTrainingSample" disabled>Save sample dataset</button></div>
+              <p id="training-sample-feedback" role="status"></p>
+            </section>
+          </div>
         </section>
         <section id="biz-tab-profile" class="panel" style="display:none">
           <h3>Business profile</h3>

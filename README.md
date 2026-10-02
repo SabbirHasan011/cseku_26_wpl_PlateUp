@@ -229,6 +229,12 @@ opening `frontend/index.html` as a file: HTML partial fetching and ES modules re
 HTTP. Existing installations need only a server restart for this refactor; it adds no
 dependencies and requires no database migration. Setup for a new database is unchanged.
 
+## Offer data preparation
+
+Business Portal → **Data preparation** provides historical offer snapshots, price/stock/order event CSVs, validated restaurant CSV imports, isolated synthetic datasets, and data-quality checks. Run `npm run db:migrate` to apply migration `005-training-data.sql`, then restart the server. Older offer details are labelled as estimated and excluded from eligible training exports. This adds data infrastructure; ML and automatic pricing remain planned.
+
+Generate a reproducible 900-row sample CSV with `npm run data:generate`, or choose parameters in the Business Portal. Samples never create live orders or inflate sales reports. See [the data format and workflow](docs/training-data.md) for import fields, provenance, eligibility and limitations.
+
 ## Testing
 
 Run the API and frontend test suites with:
