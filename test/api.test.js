@@ -138,6 +138,7 @@ test('relational marketplace flow and ownership rules', async () => {
     const unrated=(await call('/listings/'+listingId,'GET',undefined,customer)).body.listing;
     assert.equal(unrated.average_rating,null);
     assert.equal(unrated.review_count,0);
+    assert.equal(Date.parse(unrated.pickup_deadline),Date.parse(daily.rows[0].offer_date+'T00:00:00+06:00')+86400000,'Pickup deadlines carry the Bangladesh timezone independently of the server timezone');
     const distant=await call('/listings','POST',{
       title:'Other city meal '+marker,category:'Bakery',original_price:100,rescue_price:50,
       offer_start_time:'00:00',offer_end_time:'00:00'
@@ -227,6 +228,13 @@ test('relational marketplace flow and ownership rules', async () => {
     const placed=await call('/orders','POST',{ listing_id:listingId,quantity:2,payment_method:'Pay at pickup' },customer);
     assert.equal(placed.status,201);
     const orderId=placed.body.orders[0].id;
+    const pendingToday=(await call('/business/analytics','GET',undefined,business)).body.today;
+    assert.equal(pendingToday.incoming_orders,1);
+    assert.equal(pendingToday.completed_pickups,0);
+    assert.equal(Number(pendingToday.revenue),0);
+    const otherToday=(await call('/business/analytics','GET',undefined,other)).body.today;
+    assert.equal(otherToday.incoming_orders,0);
+    assert.equal(otherToday.remaining_portions,2,'Dashboard inventory is isolated by business');
     const pickupCode=placed.body.orders[0].pickup_code;
     assert.match(pickupCode,new RegExp('^'+orderId+'-[0-9A-F]{6}$'));
     assert.equal((await call('/orders','GET',undefined,customer)).body.find(order=>order.id===orderId).pickup_code,pickupCode);
@@ -266,6 +274,10 @@ test('relational marketplace flow and ownership rules', async () => {
     const sale=await pool.query('SELECT quantity_sold,price FROM sales_data WHERE order_id=$1',[orderId]);
     assert.equal(sale.rows[0].quantity_sold,2);
     assert.equal(Number(sale.rows[0].price),100);
+    const collectedToday=(await call('/business/analytics','GET',undefined,business)).body.today;
+    assert.equal(collectedToday.incoming_orders,0);
+    assert.equal(collectedToday.completed_pickups,1);
+    assert.equal(Number(collectedToday.revenue),100);
     const reviewed=await call('/reviews','POST',{ order_id:orderId,rating:5,comment:'Great meal' },customer);
     assert.equal(reviewed.status,201);
     const reviewId=reviewed.body.review.id;
@@ -301,6 +313,9 @@ test('relational marketplace flow and ownership rules', async () => {
     assert.equal((await call('/listings/' + listingId + '/today','PUT',{ initial_quantity:4 },business)).status,200);
     const preserved=await pool.query('SELECT initial_quantity,remaining_quantity FROM daily_availability WHERE id=$1',[yesterday.rows[0].id]);
     assert.deepEqual(preserved.rows[0],{ initial_quantity:4,remaining_quantity:2 });
+    const currentItems=(await call('/business/listings','GET',undefined,business)).body;
+    const currentStock=currentItems.filter(item=>['Active','Scheduled for Today'].includes(item.daily_status)).reduce((sum,item)=>sum+Number(item.remaining_quantity),0);
+    assert.equal((await call('/business/analytics','GET',undefined,business)).body.today.remaining_portions,currentStock,'Previous inventory is excluded from today’s totals');
     // Average multiple completed-purchase reviews of this item, not other meals.
     assert.equal((await call('/reviews','POST',{ order_id:orderId,rating:4,comment:'Good meal' },customer)).status,201);
     const third=await call('/orders','POST',{ listing_id:listingId,quantity:1 },customer);

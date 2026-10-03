@@ -1,13 +1,23 @@
 import { state } from './state.js';
 import { loadCities, renderProfile } from './profile.js';
 import { requestJson } from './api.js';
-import { renderTopNav, showScreen } from './router.js';
+import { renderTopNav, showScreen, navigateAfterLogin, clearReturnRoute } from './router.js';
 import { restoreCart, persistCart } from './cart.js';
 import { loadFavorites } from './favorites.js';
 import { loadBusiness } from './business.js';
 import { refreshNotifications } from './notifications.js';
 import { el, closeModal } from './ui.js';
 import { renderListings } from './marketplace.js';
+import { notify } from './feedback.js';
+
+export async function openBusinessSignup() {
+  if(!await showScreen('login'))return;
+  const tab=[...document.querySelectorAll('.auth-tab')].find(node=>node.dataset.arg0==='signup');
+  const role=[...document.querySelectorAll('.role-opt')].find(node=>node.dataset.arg0==='business');
+  if(!tab||!role)return;
+  switchAuthMode('signup',tab);selectRole('business',role);
+  el('signup-name').focus();
+}
 
 export async function loadAccount(throwOnFailure = false) {
   if (!state.token) return;
@@ -74,7 +84,7 @@ export async function handleLogin(event) {
     localStorage.setItem('plateup_token', state.token);
     await loadAccount(true);
     if (!state.currentUser) throw new Error('Could not load your account. Please try again.');
-    await showScreen(state.currentUser.role === 'business' ? 'business' : 'customer');
+    await navigateAfterLogin();
   } catch (error) {
     if (!state.currentUser) {
       state.token = null;
@@ -101,6 +111,7 @@ export async function handleSignup(event) {
 }
 
 export function handleLogout() {
+  clearReturnRoute();
   persistCart(); state.restoredCartOwner=null; state.favoriteRequest++;
   state.favorites={saved:[],restaurants:[],listings:[]};
   closeModal('password-change-modal'); closeModal('reject-order-modal');
@@ -128,7 +139,7 @@ export async function changePassword(event) {
   event.preventDefault(); if(el('password-change-submit').disabled)return;
   if(el('password-new').value!==el('password-confirm').value){el('password-change-feedback').textContent='New passwords do not match.';return;}
   el('password-change-submit').disabled=true;
-  try{const result=await requestJson('/auth/change-password',{method:'POST',body:JSON.stringify({current_password:el('password-current').value,new_password:el('password-new').value})});closeModal('password-change-modal');el('password-change-form').reset();handleLogout();await showScreen('login');alert(result.message);}
+  try{const result=await requestJson('/auth/change-password',{method:'POST',body:JSON.stringify({current_password:el('password-current').value,new_password:el('password-new').value})});closeModal('password-change-modal');el('password-change-form').reset();handleLogout();await showScreen('login');notify(result.message);}
   catch(error){el('password-change-feedback').textContent=error.message;}
   finally{el('password-change-submit').disabled=false;}
 }
@@ -142,17 +153,17 @@ export async function requestPasswordReset(event) {
   finally{el('recovery-submit').disabled=false;}
 }
 
-export async function captureResetLink() {
-  const match=/^#reset=([a-f0-9]{64})$/.exec(location.hash||'');
+export async function captureResetLink(hash=location.hash) {
+  const match=/^#reset=([a-f0-9]{64})$/.exec(hash||'');
   if(!match)return false;
-  state.resetPasswordToken=match[1];history.replaceState(null,'',location.pathname+location.search);await showScreen('reset-password');return true;
+  state.resetPasswordToken=match[1];history.replaceState(null,'',location.pathname+location.search);await showScreen('reset-password',{historyMode:'replace'});return true;
 }
 
 export async function resetPassword(event) {
   event.preventDefault();if(el('reset-submit').disabled)return;
   if(el('reset-new').value!==el('reset-confirm').value){el('reset-feedback').textContent='Passwords do not match.';return;}
   el('reset-submit').disabled=true;
-  try{const result=await requestJson('/auth/reset-password',{method:'POST',body:JSON.stringify({token:state.resetPasswordToken,new_password:el('reset-new').value})});state.resetPasswordToken=null;el('reset-form').reset();handleLogout();await showScreen('login');alert(result.message);}
+  try{const result=await requestJson('/auth/reset-password',{method:'POST',body:JSON.stringify({token:state.resetPasswordToken,new_password:el('reset-new').value})});state.resetPasswordToken=null;el('reset-form').reset();handleLogout();await showScreen('login');notify(result.message);}
   catch(error){el('reset-feedback').textContent=error.message;}
   finally{el('reset-submit').disabled=false;}
 }

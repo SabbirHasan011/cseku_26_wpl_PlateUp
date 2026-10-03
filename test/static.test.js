@@ -14,6 +14,13 @@ test('Express serves the shell, every view/module and CSS while keeping server/c
     assert.doesNotMatch(shell,/id="(?:customer|business|login)"/);
     const legacy=await fetch(base+'/UI_PlateUp.html',{redirect:'manual'});
     assert.equal(legacy.status,302);assert.equal(legacy.headers.get('location'),'/');
+    for(const url of ['/login','/browse-food','/restaurants','/restaurants/12','/orders','/favorites',
+      '/profile','/forgot-password','/reset-password','/business','/business/overview','/business/listings',
+      '/business/orders','/business/analytics','/business/reviews','/business/profile','/business/training/']) {
+      const response=await fetch(base+url);
+      assert.equal(response.status,200,url);
+      assert.equal(await response.text(),shell,url+' must support a direct visit or refresh');
+    }
     for(const file of fs.readdirSync(path.join(__dirname,'../frontend'),{recursive:true}).filter(name=>/\.(html|css|js)$/.test(name))) {
       const response=await fetch(base+'/frontend/'+file.replaceAll(path.sep,'/'));
       assert.equal(response.status,200,file);
@@ -28,7 +35,7 @@ test('Express serves the shell, every view/module and CSS while keeping server/c
         assert.doesNotMatch(source,/\bon(?:click|submit|change|input|keydown|keyup)=/i,file);
       }
     }
-    for(const url of ['/server/index.js','/.env','/frontend/.env','/frontend/../server/db.js','/frontend/%2e%2e%2fserver%2fdb.js','/server/migrate.sql']) {
+    for(const url of ['/not-a-page','/business/unknown','/restaurants/not-an-id','/server/index.js','/.env','/frontend/.env','/frontend/../server/db.js','/frontend/%2e%2e%2fserver%2fdb.js','/server/migrate.sql']) {
       assert.equal((await fetch(base+url)).status,404,url);
     }
     assert.equal((await fetch(base+'/api/not-a-real-route')).status,404);

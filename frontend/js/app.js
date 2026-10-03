@@ -6,7 +6,8 @@ import { loadFavorites } from './favorites.js';
 import { ensureView, hasView, showLoadError } from './views.js';
 import { installActions } from './events.js';
 import { installDialogKeyboard } from './ui.js';
-import { renderTopNav, showScreen, retryNavigation } from './router.js';
+import { renderTopNav, showScreen, installPageHistory, retryNavigation } from './router.js';
+import { readPageUrl } from './page-urls.js';
 import { loadAccount, captureResetLink } from './auth.js';
 import { loadInitialData } from './marketplace.js';
 import { refreshOrderActivity } from './notifications.js';
@@ -25,6 +26,7 @@ let starting = false;
 export async function startApp() {
   if (started || starting) return;
   starting = true;
+  const initialPage=readPageUrl(),initialHash=location.hash;
   try {
     await Promise.all([ensureView('navbar'), ensureView('dialogs')]);
     installActions();
@@ -32,9 +34,10 @@ export async function startApp() {
     renderTopNav();
     await loadAccount();
     await loadInitialData();
-    if (!await captureResetLink()) {
-      await showScreen(localStorage.getItem('plateup_screen') || 'home');
+    if (!await captureResetLink(initialHash)) {
+      await showScreen(initialPage.screen,{...initialPage,historyMode:'replace'});
     }
+    installPageHistory();
     window.addEventListener('focus', refreshVisibleData);
     window.addEventListener('focus', refreshOrderActivity);
     setInterval(refreshVisibleData, 30000);

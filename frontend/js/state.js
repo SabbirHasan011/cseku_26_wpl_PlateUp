@@ -18,6 +18,7 @@ export const state = {
   selectedRole: 'customer',
   activeCategory: 'All',
   activeScreen: 'home',
+  activeBusinessTab: 'overview',
   editingListingId: null,
   foodCategories: [],
   latestCategoryRequest: 0,

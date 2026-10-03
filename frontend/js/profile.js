@@ -1,8 +1,8 @@
+import { notify } from './feedback.js';
 import { state } from './state.js';
 import { requestJson } from './api.js';
 import { el, escapeHtml, date, money, closeModal } from './ui.js';
 import { showScreen } from './router.js';
-import { switchBizTab } from './business.js';
 import { renderMyOrders } from './orders.js';
 import { persistCart } from './cart.js';
 import { renderListings, fetchListings, loadInitialData } from './marketplace.js';
@@ -30,7 +30,7 @@ export function selectedCityId(inputId) {
 export async function openCitySettings() {
   if (!state.currentUser) return showScreen('login');
   if (state.currentUser.role === 'business') {
-    await showScreen('business'); switchBizTab('profile',el('business-profile-nav'));
+    await showScreen('business',{tab:'profile'});
   } else showScreen('profile');
 }
 
@@ -96,8 +96,8 @@ export async function saveProfile(event) {
       closeModal('listing-detail-modal'); closeModal('checkout-modal'); renderListings();
     }
     await loadAccount(); await fetchListings();
-    alert(cityChanged ? 'Profile saved. Your feed now uses your updated city, and your cart has been cleared.' : 'Profile saved.');
-  } catch(error) { alert(error.message); }
+    notify(cityChanged ? 'Profile saved. Your feed now uses your updated city, and your cart has been cleared.' : 'Profile saved.');
+  } catch(error) { notify(error.message,'error'); }
 }
 
 export async function saveBusinessProfile(event) {
@@ -110,6 +110,6 @@ export async function saveBusinessProfile(event) {
       opening_time:el('business-profile-open').value, closing_time:el('business-profile-close').value,
       latitude:el('business-profile-lat').value, longitude:el('business-profile-lon').value
     }) });
-    await loadAccount(); await loadInitialData(); alert('Business profile saved.');
-  } catch(error) { alert(error.message); }
+    await loadAccount(); await loadInitialData(); notify('Business profile saved.');
+  } catch(error) { notify(error.message,'error'); }
 }

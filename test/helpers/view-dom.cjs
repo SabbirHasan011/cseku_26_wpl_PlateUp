@@ -12,6 +12,7 @@ function viewDOM() {
       classList: { add: value=>values.add(value), remove: value=>values.delete(value), contains:value=>values.has(value),
         toggle(value, force) { const add=force ?? !values.has(value); if(add) values.add(value); else values.delete(value); return add; } },
       setAttribute(name,value) { attributes[name]=value; },
+      getAttribute(name) { return attributes[name]??null; },
       addEventListener(type,fn) { const key=(result.id||tag)+':'+type; listenerCounts.set(key,(listenerCounts.get(key)||0)+1); listeners.set(key,fn); },
       appendChild(fragment) { result.children.push(...fragment.nodes); mounted.push(...fragment.nodes); fragment.nodes.forEach(n=>n.isConnected=true); },
       focus() { document.activeElement=result; }, reset() {}, contains() { return false; }, getClientRects() { return [{}]; },
@@ -54,7 +55,7 @@ function viewDOM() {
     }
   };
   document.body=node('body');
-  for(const id of ['app','navbar','dialogs','app-status','app-status-message','app-retry']) {
+  for(const id of ['app','navbar','dialogs','app-status','app-status-message','app-retry','app-notice','app-notice-message']) {
     const n=node('div',{id});n.isConnected=true;mounted.push(n);
   }
   return {document,listeners,listenerCounts,mounted};

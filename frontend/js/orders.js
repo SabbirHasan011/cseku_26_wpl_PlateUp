@@ -1,3 +1,4 @@
+import { notify } from './feedback.js';
 import { state } from './state.js';
 import { requestJson } from './api.js';
 import { loadBusiness } from './business.js';
@@ -13,7 +14,7 @@ export async function changeOrder(id,status) {
     else { state.orders=await requestJson('/orders'); renderProfile(); }
     await loadInitialData();
     await refreshNotifications();
-  } catch(error) { alert(error.message); }
+  } catch(error) { notify(error.message,'error'); }
 }
 
 export function renderBusinessOrders() {

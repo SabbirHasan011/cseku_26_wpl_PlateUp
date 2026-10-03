@@ -1,8 +1,8 @@
+import { notify } from './feedback.js';
 import { state } from './state.js';
 import { requestJson } from './api.js';
 import { el, escapeHtml, date, closeModal } from './ui.js';
 import { showScreen } from './router.js';
-import { switchBizTab } from './business.js';
 import { loadAccount } from './auth.js';
 import { renderBusinessOrders, renderMyOrders } from './orders.js';
 import { renderProfile } from './profile.js';
@@ -32,7 +32,7 @@ export async function openNotifications() {
 
 export async function markNotificationRead(id) {
   try { await requestJson('/notifications/'+id+'/read',{ method:'PATCH' }); await refreshNotifications(); }
-  catch(error) { alert(error.message); }
+  catch(error) { notify(error.message,'error'); }
 }
 
 export async function markNotificationsRead() {
@@ -40,14 +40,14 @@ export async function markNotificationsRead() {
   try {
     await requestJson('/notifications/read',{ method:'PATCH',body:JSON.stringify({ through_id:Math.max(...state.notifications.map(note=>note.id)) }) });
     await refreshNotifications();
-  } catch(error) { alert(error.message); }
+  } catch(error) { notify(error.message,'error'); }
 }
 
 export async function openNotificationOrder(id) {
   const note=state.notifications.find(note=>note.id===id);
   if (!note) return;
   await markNotificationRead(id); closeModal('notifications-modal');
-  if (state.currentUser?.role==='business') { await showScreen('business'); switchBizTab('orders',document.querySelector('[data-biz-tab="orders"]')); }
+  if (state.currentUser?.role==='business') await showScreen('business',{tab:'orders'});
   else { await loadAccount(); showScreen('my-orders'); }
 }
 

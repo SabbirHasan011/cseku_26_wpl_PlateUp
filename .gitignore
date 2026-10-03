@@ -1,5 +1,8 @@
 # Installed dependencies belong to this machine, not to a milestone branch.
 node_modules/
+data/generated/
+__pycache__/
+.venv/
 
 # Local credentials; the placeholder template can be committed.
 .env

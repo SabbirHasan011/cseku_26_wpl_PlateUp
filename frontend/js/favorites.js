@@ -1,3 +1,4 @@
+import { notify } from './feedback.js';
 import { state } from './state.js';
 import { requestJson } from './api.js';
 import { renderListings, foodCard } from './marketplace.js';
@@ -30,7 +31,7 @@ export async function toggleFavorite(kind,id) {
     await requestJson('/favorites/'+kind+'/'+id,{method:saved?'DELETE':'PUT'});
     await loadFavorites();
     if(state.activeScreen==='restaurant') renderRestaurantMenu();
-  } catch(error) { alert(error.message); }
+  } catch(error) { notify(error.message,'error'); }
 }
 
 export function updateRestaurantFavorite() {

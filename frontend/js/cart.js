@@ -1,3 +1,4 @@
+import { notify } from './feedback.js';
 import { state } from './state.js';
 import { showScreen, renderTopNav } from './router.js';
 import { el, money, itemThumbnail, escapeHtml, pickupDate, closeModal } from './ui.js';
@@ -13,7 +14,7 @@ export function addToCart(id,quantity = 1) {
   if (!item) return false;
   const reserved = state.cartItems.filter(row => row.listing_id === id).length;
   if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity + reserved > Number(item.quantity)) {
-    alert('Choose a whole number of portions within the available stock.'); return false;
+    notify('Choose a whole number of portions within the available stock.','error'); return false;
   }
   for (let i = 0; i < quantity; i++) state.cartItems.push({ listing_id:id,title:item.title,price:Number(item.rescue_price),
     image_path:item.image_path,business_name:item.business_name });
@@ -44,6 +45,7 @@ export function renderCart() {
       escapeHtml(item.business_name||'Restaurant pickup')+'</span><h3>'+escapeHtml(item.title)+'</h3></div><button type="button" class="cart-remove" '+
       (state.orderSubmitting?'disabled':'')+' data-click="removeCartItem" data-arg0="'+item.listing_id+'" aria-label="Remove '+escapeHtml(item.title)+'">&times;</button></div>'+
       '<p class="cart-unit-price">'+money(item.price)+' <span>per portion</span></p>'+
+      (quoted?.pricing_source==='synthetic_model'?'<small class="pricing-demo-label">Demo model price</small>':'')+
       (quoted?.pickup_deadline?'<p class="cart-pickup-deadline">Pick up by '+pickupDate(quoted.pickup_deadline)+'</p>':'')+
       '<div class="cart-line-controls"><div class="cart-stepper">'+
       '<button type="button" aria-label="Remove one portion of '+escapeHtml(item.title)+'" '+(state.orderSubmitting||item.quantity<=1?'disabled':'')+' data-click="stepCartQuantity" data-arg0="'+item.listing_id+'" data-arg1="-1">&minus;</button>'+
@@ -138,7 +140,7 @@ export async function confirmOrder() {
     state.cartItems=[]; persistCart(); state.cartQuote=null; state.cartQuoteRequest++; closeModal('checkout-modal'); renderTopNav();
     state.orders=await requestJson('/orders'); await loadInitialData(); renderProfile(); await refreshNotifications();
     showScreen('my-orders');
-    alert('Reservation placed. Find your pickup code and deadline in My Orders.');
+    notify('Reservation placed. Find your pickup code and deadline in My Orders.');
   } catch(error) {
     if (session!==state.token) return;
     await refreshCartQuote(); el('cart-feedback').textContent=error.message;

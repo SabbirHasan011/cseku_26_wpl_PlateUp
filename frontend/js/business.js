@@ -6,6 +6,10 @@ import { renderListings } from './marketplace.js';
 import { el, money, escapeHtml, date } from './ui.js';
 import { renderReviews } from './reviews.js';
 import { renderProfile } from './profile.js';
+import { loadTrainingData } from './training.js';
+import { showScreen } from './router.js';
+import { businessTabs } from './page-urls.js';
+import { notify, skeletonCards } from './feedback.js';
 
 export async function loadBusiness() {
   if (!state.currentUser || state.currentUser.role !== 'business') return;
@@ -13,6 +17,7 @@ export async function loadBusiness() {
   try {
     await ensureView('business');
     if (session !== state.token || state.currentUser?.role !== 'business') return;
+    if(!state.businessListings.length)el('business-listings').innerHTML=skeletonCards(2);
     const [own, incoming, analytics, predictions] = await Promise.all([
       requestJson('/business/listings'), requestJson('/orders'),
       requestJson('/business/analytics'), requestJson('/business/predictions')
@@ -20,6 +25,17 @@ export async function loadBusiness() {
     if (session !== state.token || state.currentUser?.role !== 'business') return;
     state.businessListings = own;
     state.businessOrders = incoming;
+    const today=analytics.today;
+    el('biz-today-portions').textContent=today?.remaining_portions??'—';
+    el('biz-today-incoming').textContent=today?.incoming_orders??'—';
+    el('biz-today-pickups').textContent=today?.completed_pickups??'—';
+    el('biz-today-revenue').textContent=today?money(today.revenue):'—';
+    const missing=own.filter(item=>item.initial_quantity==null).length;
+    el('business-next-steps').innerHTML=!own.length
+      ? '<strong>Build your daily menu</strong><p>Add a food item once, then enter its portions each day.</p><button class="btn-pri" data-click="openNewListingModal">Add your first item</button>'
+      : '<strong>Your next steps</strong><p>'+ (missing?missing+' food item'+(missing===1?' needs':'s need')+' today’s quantity.':'Daily quantities have been entered for all your items.')+'</p>'+
+        '<button class="btn-sec" data-click="switchBizTab" data-arg0="listings">'+(missing?'Set daily quantities':'Review daily quantities')+'</button>'+
+        (Number(today?.incoming_orders)>0?'<p>'+today.incoming_orders+' incoming order'+(Number(today.incoming_orders)===1?' is':'s are')+' waiting for your response.</p><button class="btn-sec" data-click="switchBizTab" data-arg0="orders">Review incoming orders</button>':'');
     renderBusinessOrders();
     renderListings();
     el('biz-active-count').textContent = analytics.summary.active_listings;
@@ -30,34 +46,54 @@ export async function loadBusiness() {
         s.quantity_sold + ' sold · ' + money(s.price) + '</span><span>' + date(s.sale_time) + '</span></div>').join('')
       : '<div class="empty-history">No completed sales yet.</div>';
     el('business-predictions').textContent = predictions.length
-      ? predictions.map(p => p.prediction_type + ': ' + p.predicted_value).join(' · ')
-      : 'No predictions yet. The ML module has not been developed.';
+      ? predictions.slice(0,10).map(p => (p.listing_title||'Item #'+p.listing_id) + ': '+money(p.predicted_value)+
+        (p.model_source==='synthetic_model'?' (synthetic demo)':' (model)')+' · '+date(p.prediction_date)).join(' | ')
+      : 'No model price changes yet. Open Pricing & item history on a food item to train its model.';
     el('biz-name-text').textContent = state.profile.business_name || state.currentUser.name;
     el('biz-avatar-text').textContent = (state.profile.business_name || state.currentUser.name).slice(0,2).toUpperCase();
     el('biz-role-text').textContent = 'Business ID: ' + state.currentUser.id;
     renderReviews();
-  } catch (error) { alert('Could not load business data: ' + error.message); }
+  } catch (error) {
+    if(session!==state.token)return;
+    if(!state.businessListings.length)el('business-listings').innerHTML='<div class="feed-empty"><strong>Could not load your menu</strong><p>'+escapeHtml(error.message)+'</p><button class="btn-sec" data-click="loadBusiness">Try again</button></div>';
+    notify('Could not load business data: ' + error.message,'error');
+  }
 }
 
 export async function refreshBusinessListings() {
   if (state.currentUser?.role!=='business') return;
+  if(state.activeScreen==='business' && state.activeBusinessTab==='overview')return loadBusiness();
+  const session=state.token;
   try {
-    state.businessListings=await requestJson('/business/listings',{ cache:'no-store' });
+    const items=await requestJson('/business/listings',{ cache:'no-store' });
+    if(session!==state.token)return;
+    state.businessListings=items;
     renderListings();
     if (el('biz-active-count')) el('biz-active-count').textContent=state.businessListings.filter(item=>item.daily_status==='Active').length;
   } catch(error) { console.error(error); }
 }
 
 export function switchBizTab(name, element) {
-  el('biz-tab-overview').classList.toggle('listings-view',name === 'listings');
-  document.querySelectorAll('.sidebar .navitem').forEach(item => item.classList.remove('on'));
-  element?.classList.add('on');
-  ['overview','orders','analytics','reviews','profile'].forEach(tab => {
-    el('biz-tab-' + tab).style.display = tab === name || (name === 'listings' && tab === 'overview') ? 'block' : 'none';
+  if(!businessTabs.includes(name))return;
+  return showScreen('business',{tab:name});
+}
+
+export function activateBusinessTab(name) {
+  state.activeBusinessTab=name;
+  document.querySelectorAll('.sidebar .navitem').forEach(item => {
+    item.classList.toggle('on',item.dataset.arg0===name);
+    item.setAttribute('aria-current',item.dataset.arg0===name?'page':'false');
   });
+  ['overview','listings','orders','analytics','reviews','profile','training'].forEach(tab => {
+    el('biz-tab-' + tab).style.display = tab === name ? 'block' : 'none';
+  });
+  const headings={overview:['Today at your kitchen','Your daily offers and pickups, at a glance.'],listings:['Manage Listings','Save your menu once. Update today’s portions when they’re ready.'],orders:['Manage Orders','Confirm reservations and help customers collect their meals.'],analytics:['Sales & Analytics','Track the food rescued and revenue earned by your kitchen.'],training:['Sales History','Prepare and inspect your historical sales data.'],reviews:['Customer Reviews','See customer feedback and reply to their experience.'],profile:['Business Profile','Keep your kitchen’s location and contact details up to date.']};
+  el('business-mobile-tab').value=name;
+  el('business-page-title').textContent=headings[name][0];
+  el('business-page-caption').textContent=headings[name][1];
   if (name === 'profile') renderProfile();
-  if (name === 'listings') loadBusiness();
-  if (name === 'analytics') loadDailyAnalytics();
+  if (name === 'analytics') return loadDailyAnalytics();
+  if (name === 'training') return loadTrainingData();
 }
 
 export function analyticsQuery() {

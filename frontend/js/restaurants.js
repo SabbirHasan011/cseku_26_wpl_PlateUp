@@ -5,18 +5,23 @@ import { showScreen } from './router.js';
 import { favoriteButton } from './favorites.js';
 import { updateDetailQuantity, foodCard } from './marketplace.js';
 import { profileCity, normalizedCity } from './profile.js';
+import { skeletonCards } from './feedback.js';
 
 export async function loadRestaurants() {
   const requestId=++state.latestRestaurantsRequest, session=state.token;
   el('restaurant-directory-status').textContent='Loading restaurants…';
+  el('restaurant-grid').setAttribute('aria-busy','true');
+  if(!state.restaurants.length)el('restaurant-grid').innerHTML=skeletonCards(3);
   try {
     const data=await requestJson('/restaurants',{ cache:'no-store' });
     if (requestId!==state.latestRestaurantsRequest || session!==state.token) return;
     state.restaurants=data; renderRestaurants();
   } catch(error) {
     if (requestId!==state.latestRestaurantsRequest || session!==state.token) return;
-    state.restaurants=[]; el('restaurant-grid').innerHTML='';
+    state.restaurants=[]; el('restaurant-grid').innerHTML='<div class="feed-empty"><strong>Restaurants could not be loaded</strong><p>Check your connection and try again.</p><button class="btn-sec" data-click="loadRestaurants">Try again</button></div>';
     el('restaurant-directory-status').textContent='Could not load restaurants: '+error.message;
+  } finally {
+    if(requestId===state.latestRestaurantsRequest)el('restaurant-grid').setAttribute('aria-busy','false');
   }
 }
 
@@ -37,8 +42,7 @@ export function renderRestaurants() {
 }
 
 export async function openRestaurant(id) {
-  state.selectedRestaurantId=id; state.selectedRestaurant=null; state.restaurantListings=[];
-  return showScreen('restaurant');
+  return showScreen('restaurant',{restaurantId:id});
 }
 
 export async function loadRestaurant() {
@@ -49,6 +53,8 @@ export async function loadRestaurant() {
   }
   const id=state.selectedRestaurantId, requestId=++state.latestRestaurantRequest, session=state.token;
   el('restaurant-menu-status').textContent='Loading restaurant menu…';
+  el('restaurant-menu-grid').setAttribute('aria-busy','true');
+  if(!state.restaurantListings.length)el('restaurant-menu-grid').innerHTML=skeletonCards(3);
   try {
     const data=await requestJson('/restaurants/'+id,{ cache:'no-store' });
     if (requestId!==state.latestRestaurantRequest || id!==state.selectedRestaurantId || session!==state.token) return;
@@ -68,8 +74,10 @@ export async function loadRestaurant() {
   } catch(error) {
     if (requestId!==state.latestRestaurantRequest || id!==state.selectedRestaurantId || session!==state.token) return;
     state.selectedRestaurant=null; state.restaurantListings=[];
-    el('restaurant-profile').innerHTML=''; el('restaurant-menu-grid').innerHTML='';
+    el('restaurant-profile').innerHTML=''; el('restaurant-menu-grid').innerHTML='<div class="feed-empty"><strong>The menu could not be loaded</strong><p>Check your connection and try again.</p><button class="btn-sec" data-click="loadRestaurant">Try again</button></div>';
     el('restaurant-menu-status').textContent='Could not load restaurant: '+error.message;
+  } finally {
+    if(requestId===state.latestRestaurantRequest)el('restaurant-menu-grid').setAttribute('aria-busy','false');
   }
 }
 

@@ -1,3 +1,4 @@
+import { notify } from './feedback.js';
 import { state } from './state.js';
 import { el, escapeHtml, closeModal } from './ui.js';
 import { requestJson } from './api.js';
@@ -53,7 +54,7 @@ export async function submitReviewReply(id) {
     await requestJson('/reviews/' + id + '/reply',{ method:'PATCH',
       body:JSON.stringify({ reply:el('reply-input-' + id).value }) });
     state.reviews=await requestJson('/reviews'); renderReviews(); renderHomeReviews();
-  } catch(error) { alert(error.message); }
+  } catch(error) { notify(error.message,'error'); }
 }
 
 export function openReviewModal(orderId) {
@@ -78,7 +79,7 @@ export async function submitCustomerReview() {
     });
     closeModal('review-modal'); state.reviews=await requestJson('/reviews');
     renderProfile(); renderHomeReviews(); await fetchListings();
-  } catch(error) { alert(error.message); }
+  } catch(error) { notify(error.message,'error'); }
 }
 
 export async function deleteReview(id) {
@@ -86,5 +87,5 @@ export async function deleteReview(id) {
   try {
     await requestJson('/reviews/' + id, { method:'DELETE' });
     state.reviews=await requestJson('/reviews'); renderProfile(); renderHomeReviews(); await fetchListings();
-  } catch(error) { alert(error.message); }
+  } catch(error) { notify(error.message,'error'); }
 }
