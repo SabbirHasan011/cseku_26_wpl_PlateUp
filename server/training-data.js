@@ -85,19 +85,27 @@ function registerTrainingData(app,{auth,role,wrap}) {
     try {
       await db.query('BEGIN');
       await db.query('SELECT user_id FROM businesses WHERE user_id=$1 FOR UPDATE',[req.user.userId]);
+      let listingId=null;
+      if(req.query.listing_id!==undefined) {
+        if(!/^\d+$/.test(req.query.listing_id)) {await db.query('ROLLBACK');return res.status(400).json({message:'Invalid food item.'});}
+        const own=await db.query('SELECT id FROM listings WHERE id=$1 AND business_id=$2 AND is_active FOR UPDATE',[req.query.listing_id,req.user.userId]);
+        if(!own.rows.length){await db.query('ROLLBACK');return res.status(404).json({message:'Food item not found.'});}
+        listingId=own.rows[0].id;
+        if(new Set(validation.rows.map(r=>r.item_reference)).size!==1){await db.query('ROLLBACK');return res.status(400).json({message:'Upload history for one item reference at a time.'});}
+      }
       const json=JSON.stringify(validation.rows);
       const duplicate=await db.query(`SELECT r.item_reference,r.offer_date::text,r.data_source FROM training_records r
         JOIN jsonb_to_recordset($2::jsonb) AS incoming(item_reference text,offer_date date,data_source text)
-        ON r.item_reference=incoming.item_reference AND r.offer_date=incoming.offer_date AND r.data_source=incoming.data_source
-        WHERE r.business_id=$1 LIMIT 50`,[req.user.userId,json]);
+        ON (r.item_reference=incoming.item_reference OR r.listing_id=$3) AND r.offer_date=incoming.offer_date AND r.data_source=incoming.data_source
+        WHERE r.business_id=$1 LIMIT 50`,[req.user.userId,json,listingId]);
       if(duplicate.rows.length){await db.query('ROLLBACK');return res.status(409).json({message:'Some item/date/source records already exist. Nothing was imported.',duplicates:duplicate.rows});}
       if(req.query.dry_run==='true') {
         await db.query('ROLLBACK');
         return res.json({message:'File validated. No records saved.',valid:true,count:validation.rows.length});
       }
-      await db.query(`INSERT INTO training_records(business_id,item_reference,offer_date,data_source,record)
-        SELECT $1,value->>'item_reference',(value->>'offer_date')::date,value->>'data_source',value
-        FROM jsonb_array_elements($2::jsonb)`,[req.user.userId,json]);
+      await db.query(`INSERT INTO training_records(business_id,item_reference,offer_date,data_source,record,listing_id)
+        SELECT $1,value->>'item_reference',(value->>'offer_date')::date,value->>'data_source',value,$3
+        FROM jsonb_array_elements($2::jsonb)`,[req.user.userId,json,listingId]);
       await db.query('COMMIT');
       res.status(201).json({message:'Imported '+validation.rows.length+' isolated dataset records.',count:validation.rows.length});
     } catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}

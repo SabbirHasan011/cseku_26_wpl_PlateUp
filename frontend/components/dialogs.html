@@ -1,3 +1,30 @@
+<!-- Item-specific history and dynamic pricing -->
+<div class="modal-overlay" id="item-pricing-modal">
+  <div class="modal pricing-dialog" role="dialog" aria-modal="true" aria-labelledby="pricing-title">
+    <header class="food-editor-header"><div><p class="profile-label">Your price boundaries, always respected</p><h3 id="pricing-title">Item pricing &amp; history</h3></div>
+      <button class="food-editor-close" type="button" aria-label="Close pricing" data-click="closeModal" data-arg0="item-pricing-modal">&times;</button></header>
+    <div class="pricing-dialog-body">
+      <div id="pricing-summary" class="pricing-summary"></div>
+      <p id="pricing-state" class="pricing-state"></p>
+      <section class="pricing-section"><h4>1. Add this item's sales history</h4>
+        <p>Upload one item per CSV, using the existing daily-offer template. New dates are added without replacing historical records. At least 30 eligible dates and three distinct price ratios are needed.</p>
+        <p id="pricing-counts"></p>
+        <label for="pricing-file">Restaurant history CSV</label><input type="file" id="pricing-file" accept=".csv,text/csv">
+        <div class="pricing-buttons"><button class="btn-pri" type="button" data-pricing-action data-click="importItemHistory">Import item history</button>
+          <button class="btn-sec" type="button" data-click="downloadTrainingFile" data-arg0="template">Download template</button></div>
+      </section>
+      <section class="pricing-section"><h4>2. Train the item model</h4>
+        <label for="pricing-source">Training source</label><select id="pricing-source"><option value="restaurant">Imported restaurant history</option><option value="platform">Eligible PlateUp offers</option><option value="synthetic">Synthetic demo history</option></select>
+        <p>Sources are kept separate. Training checks the latest dates against a baseline; unsuitable models leave fallback pricing active. Retrain after adding new history or editing the item.</p>
+        <button class="btn-pri" type="button" data-pricing-action data-click="trainItemModel">Train / retrain</button>
+        <div id="pricing-metrics" class="pricing-metrics"></div>
+      </section>
+      <details class="pricing-section"><summary>Try a clearly labelled academic demo</summary><p>Generate and save 180 synthetic offers for this item. These do not change inventory or sales and cannot establish real-world accuracy.</p>
+        <button class="btn-sec" type="button" data-pricing-action data-click="useItemSample">Use synthetic demo history</button></details>
+      <p id="pricing-feedback" class="editor-feedback" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+</div>
 <!-- Modal: Add or edit a reusable food item -->
 <div class="modal-overlay" id="new-listing-modal">
   <div class="modal food-editor" role="dialog" aria-modal="true" aria-labelledby="listing-modal-title">
@@ -24,9 +51,10 @@
         <h4><span>02</span> Set your prices <small>Per portion</small></h4>
         <div class="form-row">
           <div class="form-group"><label for="m-orig-price">Original price (৳)</label><input type="number" id="m-orig-price" placeholder="300" min="0" step="1" required></div>
-          <div class="form-group rescue-price-field"><label for="m-rescue-price">Rescue price (৳)</label><input type="number" id="m-rescue-price" placeholder="150" min="0" step="1" required></div>
+          <div class="form-group rescue-price-field"><label for="m-rescue-price">Minimum price (৳)</label><input type="number" id="m-rescue-price" placeholder="150" min="0" step="1" required></div>
         </div>
       </section>
+      <p class="pricing-editor-note">Customers receive at least 20% off. Set a minimum no higher than 80% of the original price. We use your minimum until you train a suitable item model. Add sales history from Manage Listings after saving.</p>
       <section class="food-editor-section offer-editor">
         <h4><span>03</span> Daily offer window <small>Bangladesh time</small></h4>
         <div class="form-row">

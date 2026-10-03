@@ -35,6 +35,19 @@ export function itemRating(item) {
 }
 
 export const pickupDate=value=>value?new Date(value).toLocaleString('en-GB',{timeZone:'Asia/Dhaka',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true})+' BST':'Not specified';
+export function pickupDeadline(item) {
+  const raw=item.pickup_deadline||item.available_until;
+  if(!raw)return offerTime(item.offer_end_time)+' · Bangladesh time';
+  // PostgreSQL returns local timestamp strings without an offset here.
+  const deadline=/([zZ]|[+-]\d\d:\d\d)$/.test(raw)?raw:raw+'+06:00';
+  return pickupDate(deadline);
+}
+export function toggleNavigation() {
+  const menu=el('nav-menu'),button=el('nav-menu-toggle');
+  if(!menu||!button)return;
+  const open=menu.classList.toggle('is-open');
+  button.setAttribute('aria-expanded',String(open));
+}
 
 export function closeModal(id) {
   el(id).classList.remove('active');
@@ -65,7 +78,8 @@ document.addEventListener('keydown',event => {
     event.preventDefault(); saveFoodCategory(); return;
   }
   if (event.key==='Escape' && state.offerTimeDraft) { event.preventDefault(); closeOfferTimePicker(); return; }
-  const modalId=['password-change-modal','reject-order-modal','checkout-modal','listing-detail-modal','new-listing-modal'].find(id=>el(id)?.classList.contains('active'));
+  if(event.key==='Escape'&&el('nav-menu')?.classList.contains('is-open')) { event.preventDefault();toggleNavigation();el('nav-menu-toggle').focus();return; }
+  const modalId=['item-pricing-modal','password-change-modal','reject-order-modal','checkout-modal','listing-detail-modal','new-listing-modal'].find(id=>el(id)?.classList.contains('active'));
   if (!modalId) return;
   if (event.key === 'Escape') { event.preventDefault(); closeModal(modalId); }
   if (event.key === 'Tab') {

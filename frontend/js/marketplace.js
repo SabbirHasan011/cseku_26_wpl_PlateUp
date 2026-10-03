@@ -1,7 +1,8 @@
 import { renderBusinessListings } from './listings.js';
 import { state } from './state.js';
 import { requestJson } from './api.js';
-import { el, itemThumbnail, escapeHtml, itemRating, offerTime, money, imageUrl, closeModal } from './ui.js';
+import { el, itemThumbnail, escapeHtml, itemRating, offerTime, money, imageUrl, closeModal,pickupDeadline } from './ui.js';
+import { notify,skeletonCards } from './feedback.js';
 import { renderReviews, renderHomeReviews } from './reviews.js';
 import { favoriteButton } from './favorites.js';
 import { profileCity } from './profile.js';
@@ -9,7 +10,17 @@ import { addToCart } from './cart.js';
 
 export async function fetchListings() {
   const requestId = ++state.latestListingsRequest;
-  const freshListings = await requestJson('/listings', { cache:'no-store' });
+  const grids=['listing-grid','home-featured-grid'].map(el).filter(Boolean);
+  grids.forEach(grid=>{grid.setAttribute('aria-busy','true');if(!state.listings.length)grid.innerHTML=skeletonCards();});
+  let freshListings;
+  try {freshListings=await requestJson('/listings', { cache:'no-store' });}
+  catch(error) {
+    if(requestId===state.latestListingsRequest&&!state.listings.length)grids.forEach(grid=>{
+      grid.innerHTML='<div class="feed-empty"><strong>Meals could not be loaded</strong><p>'+escapeHtml(error.message)+
+        '</p><button class="btn-sec" data-click="refreshMarketplace">Try again</button></div>';
+    });
+    throw error;
+  }finally {if(requestId===state.latestListingsRequest)grids.forEach(grid=>grid.setAttribute('aria-busy','false'));}
   if (requestId !== state.latestListingsRequest) return;
   state.listings = freshListings;
   renderListings();
@@ -24,8 +35,9 @@ export async function refreshMarketplace() {
   try { await Promise.all([fetchListings(),loadMarketplaceCategories()]); }
   catch (error) {
     console.error(error);
-    const status = el('listing-status') || el('home-featured-grid');
+    const status = el('listing-status');
     if (status) status.textContent = 'Could not refresh listings: ' + error.message;
+    else if(state.listings.length)notify('Could not refresh listings: '+error.message,'error');
   }
 }
 
@@ -34,16 +46,21 @@ export async function loadInitialData() {
     await Promise.all([fetchListings(),loadMarketplaceCategories(), requestJson('/reviews').then(data => { state.reviews = data; })]);
     renderReviews();
     renderHomeReviews();
-  } catch (error) { console.error(error); alert('Could not load marketplace data: ' + error.message); }
+  } catch (error) { console.error(error); notify('Could not load marketplace data: ' + error.message,'error'); }
 }
 
 export function foodCard(item) {
+  const original=Number(item.original_price),price=Number(item.rescue_price);
+  const discount=original>0?Math.max(0,Math.floor((1-price/original)*100+1e-9)):0;
+  const quantity=Number(item.quantity)||0;
   return '<div class="food-card">' + itemThumbnail(item) + '<div class="food-body"><div class="biz-line">' +
     escapeHtml(item.business_name) + '</div><p class="food-title">' + escapeHtml(item.title) +
-    '</p>' + itemRating(item) + '<div class="food-meta">' + item.quantity + ' available · ' + escapeHtml(item.city || 'Pickup') +
-    ' · Ends ' + offerTime(item.offer_end_time) + '</div><div class="ticket"><span class="orig-price">' + money(item.original_price) +
-    '</span><span class="rescue-price">' + money(item.rescue_price) +
-    '</span></div><button class="reserve-btn" data-click="openListingDetails" data-arg0="' + item.id + '">View details</button>'+favoriteButton('listing',item.id)+'</div></div>';
+    '</p>' + itemRating(item) + '<div class="meal-facts"><span class="stock-badge '+(quantity<=3?'low':'')+'">'+quantity+
+    ' portion'+(quantity===1?'':'s')+' left</span><span>'+escapeHtml(item.city||'Pickup')+'</span></div>'+
+    '<p class="meal-pickup"><span>Pick up by</span><strong>'+escapeHtml(pickupDeadline(item))+'</strong></p>'+
+    '<div class="ticket"><div class="price-block"><span class="rescue-price">'+money(item.rescue_price)+
+    '</span><span class="orig-price">'+money(item.original_price)+'</span></div><span class="save-pill">'+(discount?discount+'% off':'Rescue price')+
+    '</span></div>'+(item.pricing_source==='synthetic_model'?'<small class="pricing-demo-label">Demo model price</small>':'')+'<button class="reserve-btn" data-click="openListingDetails" data-arg0="' + item.id + '">View details</button>'+favoriteButton('listing',item.id)+'</div></div>';
 }
 
 export function renderListings() {
@@ -64,7 +81,8 @@ export function renderListings() {
       'Where would you like to pick up?' : 'No available meals ' + (filtersActive ? 'match your filters' : 'in ' + escapeHtml(city))) +
       '</strong><p>' + (!state.currentUser ? 'Sign in and save your city to discover local meals.' : !city ?
       'Add your city to your profile to see food from local restaurants.' : 'Try again when restaurants add portions during their offer hours.') +
-      '</p><button class="btn-sec" data-click="openCitySettings">' + (!state.currentUser ? 'Sign in' : city ? 'Change city' : 'Set my city') + '</button></div>';
+      '</p><button class="btn-sec" data-click="'+(filtersActive&&city?'clearListingFilters':'openCitySettings')+'">' +
+      (filtersActive&&city?'Clear filters':!state.currentUser ? 'Sign in' : city ? 'Change city' : 'Set my city') + '</button></div>';
     el('listing-grid').innerHTML = visible.length ? visible.map(foodCard).join('') : empty;
   }
   if (el('home-featured-grid')) {
@@ -101,15 +119,15 @@ export async function openListingDetails(id) {
     const index = state.listings.findIndex(row => row.id === id);
     if (index >= 0) state.listings[index] = item;
     el('detail-title').textContent = item.title;
-    el('detail-category').textContent = item.category + ' / Rescue meal';
-    const savings = Number(item.original_price) > 0 ? Math.round((1-Number(item.rescue_price)/Number(item.original_price))*100) : 0;
+    el('detail-category').textContent = item.category + (item.pricing_source==='synthetic_model'?' / Demo model price':' / Rescue meal');
+    const savings = Number(item.original_price) > 0 ? Math.floor((1-Number(item.rescue_price)/Number(item.original_price))*100+1e-9) : 0;
     el('detail-media').innerHTML = (item.image_path ? '<img src="' + escapeHtml(imageUrl(item.image_path)) +
       '" alt="' + escapeHtml(item.title) + '">' : '<div class="detail-placeholder"><span aria-hidden="true">&#127858;</span><span>A good meal. A little less waste.</span></div>') +
       (savings > 0 ? '<span class="detail-savings">Save ' + savings + '%</span>' : '');
     el('detail-body').innerHTML = itemRating(item) + '<p class="detail-description">' +
       escapeHtml(item.description || 'A delicious surplus meal, ready for a second chance. Collect it directly from the restaurant.') +
-      '</p><div class="detail-price"><strong>' + money(item.rescue_price) + '</strong><span>per portion</span>' +
-      '<del>' + money(item.original_price) + '</del></div><div class="detail-pickup"><div><span class="detail-label">Pick up from</span><strong>' +
+      '</p><div class="detail-price"><strong id="detail-live-price">' + money(item.rescue_price) + '</strong><span>per portion</span>' +
+      '<del>' + money(item.original_price) + '</del></div><p class="pricing-customer-note">Prices can change before reservation. Your confirmed reservation keeps its agreed price.</p><div class="detail-pickup"><div><span class="detail-label">Pick up from</span><strong>' +
       escapeHtml(item.business_name) + '</strong><p>' + escapeHtml(item.pickup_address || 'Ask the restaurant for pickup directions') +
       ' · ' + escapeHtml(item.city) + '</p></div><div><span class="detail-label">Offer window</span><strong>' +
       offerTime(item.offer_start_time) + ' – ' + offerTime(item.offer_end_time) +
@@ -121,7 +139,7 @@ export async function openListingDetails(id) {
     el('detail-close').focus();
   } catch (error) {
     if (requestId !== state.latestDetailRequest) return;
-    alert('This meal is no longer available: ' + error.message);
+    notify('This meal is no longer available: ' + error.message,'error');
     await refreshMarketplace();
   }
 }
@@ -133,6 +151,7 @@ export function detailAvailableQuantity() {
 
 export function updateDetailQuantity() {
   if (!state.detailItem) return;
+  if(el('detail-live-price'))el('detail-live-price').textContent=money(state.detailItem.rescue_price);
   const available = detailAvailableQuantity();
   const quantity = Number(el('detail-quantity').value);
   const valid = Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= available;

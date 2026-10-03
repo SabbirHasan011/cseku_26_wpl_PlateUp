@@ -1,6 +1,6 @@
 # Offer history and dataset preparation
 
-This feature prepares data for future dynamic rescue pricing. It does not train a model, generate predictions, or change prices automatically.
+This feature prepares data for dynamic rescue pricing. The separate [item pricing module](ml-pricing.md) now trains models and applies bounded prices. This page documents the CSV and observation layer.
 
 Run `npm run db:migrate`, restart the backend, and open **Business Portal → Data preparation**.
 
@@ -81,4 +81,4 @@ All require business authentication and enforce business ownership:
 
 ## Remaining work
 
-Interval dataset construction, modelling, temporal validation, pricing policy, minimum-price/automatic-pricing controls, and prediction integration remain future work. The current daily export supports stable-offer experiments; dynamic-pricing evaluation will also need the event history and real observations. Do not use same-offer collected/remaining quantities as inputs to a prediction made before the offer. Old price history cannot be reconstructed by adding more synthetic records.
+The item pricing module now implements daily sales regression, chronological evaluation, a price policy, minimum-price controls and marketplace integration. Interval dataset construction remains future work: the daily model uses eligible stable-price offers, while dynamic-offer evaluation will need event history and real observations. Do not use same-offer collected/remaining quantities as inputs to a prediction made before the offer. Old price history cannot be reconstructed by adding more synthetic records.

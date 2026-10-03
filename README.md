@@ -27,7 +27,7 @@ The app is designed around a simple pickup-based marketplace model:
 
 ### Business features
 - Create and manage food listings
-- Set original and rescue prices
+- Set original and minimum prices; trained item models update the effective rescue price within those bounds (at least 20% off)
 - Define offer start and end times
 - Upload food images
 - Choose a saved food category from a dropdown, or use Add Category to save a new shared choice
@@ -35,6 +35,8 @@ The app is designed around a simple pickup-based marketplace model:
 - Manage daily availability and remaining stock
 - Track business orders from pending to completed
 - View sales summaries and business analytics
+- Overview shows current daily offer stock, pending orders, completed pickups and collected revenue, with shortcuts to daily quantities and orders. Lifetime totals remain separate.
+- Manage Listings has a visible Upload Sales History action per item and server-derived History needed / Ready to train / Model active / Fallback active labels. Training readiness requires 30 eligible offer dates and at least three price ratios; synthetic models remain labelled demonstrations.
 
 ### Customer features
 - Search and browse active listings from restaurants matching your selected city; customer and business profiles use a shared city catalog
@@ -50,6 +52,8 @@ The app is designed around a simple pickup-based marketplace model:
 - Show the pickup code from your order to the restaurant at collection
 - Cancel eligible orders
 - Leave reviews for completed orders
+
+Meal cards show the effective price, actual whole-percentage discount, remaining portions and the pickup deadline in Bangladesh time. Mobile navigation keeps Cart and Updates reachable beside a collapsible page menu; business pages use a compact selector. Loading cards, retry actions, actionable empty states and dismissible messages provide feedback without routine browser alerts. The homepage uses the supported “20% or more” discount claim, labels its feed “Available Meals Near You”, and opens business signup with the business role selected.
 
 ### Inventory and order handling
 - Daily inventory records per listing and date
@@ -93,7 +97,18 @@ The restaurant directory includes all active registered business accounts, inclu
 ### Important note
 PlateUp intentionally uses a modular vanilla frontend. It does not use React, Tailwind, TypeScript, or a frontend bundler. The browser loads native ES modules directly; there is no frontend build step.
 
-The AI/ML prediction features described in the broader project vision are not implemented yet in this codebase.
+Navigation updates the address bar using browser history. Examples: `/browse-food`,
+`/restaurants`, `/restaurants/12`, `/orders`, `/profile`, `/business/listings`, and
+`/business/profile`. Every business sidebar tab has its own URL. Express serves the
+application shell at these allowlisted paths, so bookmarks, direct visits, refresh,
+and Back/Forward work. The URL determines the initial page; the old saved-screen
+preference no longer overrides it. Protected pages still require the appropriate
+account, and a signed-out visitor is sent to login before returning to the requested
+page. Restart `npm start` after updating the server routes. With VS Code Live Server
+on port 5500, navigation uses `frontend/index.html#/...` because that static server
+does not handle the Express page routes.
+
+Item-specific sales regression and bounded dynamic pricing are implemented. Python/scikit-learn trains a model from an item's eligible history; Node applies its coefficients and the remaining-time pricing policy. Synthetic models are labelled demonstrations. Personalized recommendations and surplus prediction remain unimplemented. See [ML setup, workflow and limitations](docs/ml-pricing.md).
 
 ## Project structure
 
@@ -122,7 +137,8 @@ The AI/ML prediction features described in the broader project vision are not im
 ### Frontend organization
 
 `frontend/js/app.js` boots the application and installs polling once. `router.js`
-controls known screens, role redirects, remembered navigation and screen initialization.
+controls known screens, role redirects, browser history and screen initialization.
+`page-urls.js` maps screens and business tabs to allowlisted URLs.
 `views.js` fetches only allowlisted HTML partials. A screen loads on first use and stays
 mounted while hidden, preserving search fields and unfinished forms without full-page
 navigation. Concurrent loads are deduplicated; a slow earlier navigation cannot replace
@@ -139,7 +155,9 @@ views work without repeated listener registration. Do not put inline event code 
 scripts in partials. Background renderers check whether their view exists.
 
 To add a screen, create its markup in `frontend/views/`, add its controlled path to
-`views.js`, and register its initializer/role in `router.js`. Keep feature logic in its
+`views.js`, and register its initializer/role in `router.js`. Add its URL to
+`page-urls.js` and the Express shell-route allowlist in `server/index.js` so direct
+visits work. Keep feature logic in its
 own module, reusing the API client and shared state. Login/signup remain one tabbed
 view; the existing business dashboard retains its tabs. No admin view is invented.
 
@@ -231,7 +249,7 @@ dependencies and requires no database migration. Setup for a new database is unc
 
 ## Offer data preparation
 
-Business Portal → **Data preparation** provides historical offer snapshots, price/stock/order event CSVs, validated restaurant CSV imports, isolated synthetic datasets, and data-quality checks. Run `npm run db:migrate` to apply migration `005-training-data.sql`, then restart the server. Older offer details are labelled as estimated and excluded from eligible training exports. This adds data infrastructure; ML and automatic pricing remain planned.
+Business Portal → **Data preparation** provides historical offer snapshots, price/stock/order event CSVs, validated restaurant CSV imports, isolated synthetic datasets, and data-quality checks. **Manage Listings → Pricing & item history** links history to a specific item and trains its pricing model. Install Python dependencies with `python -m pip install -r ml/requirements.txt`, run `npm run db:migrate` (including migration 006), then restart the server. Older estimated offer details remain excluded from training.
 
 Generate a reproducible 900-row sample CSV with `npm run data:generate`, or choose parameters in the Business Portal. Samples never create live orders or inflate sales reports. See [the data format and workflow](docs/training-data.md) for import fields, provenance, eligibility and limitations.
 
@@ -278,7 +296,7 @@ This project is a functional MVP and still has several planned future improvemen
 - No admin dashboard
 - No full delivery logistics system
 - No dynamic rescue pricing engine
-- No ML model or recommendation engine
+- Pricing model is an academic prototype; no personalized recommendation engine or real-world performance validation yet
 - Limited geographic mapping features
 
 ## Roadmap

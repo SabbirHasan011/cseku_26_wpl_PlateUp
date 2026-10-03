@@ -1,4 +1,8 @@
 import { state } from './state.js';
+import { notify,dismissNotice } from './feedback.js';
+import { toggleNavigation } from './ui.js';
+import { openBusinessSignup } from './auth.js';
+import { openItemPricing,importItemHistory,trainItemModel,useItemSample } from './pricing.js';
 import { closeModal } from './ui.js';
 import { toggleCategoryEditor, saveFoodCategory, openOfferTimePicker, closeOfferTimePicker, previewFoodImage, submitNewListing, setOfferTimeStage, selectOfferTimePart, submitDailyQuantity, openEditListingModal, deleteListing, openNewListingModal } from './listings.js';
 import { submitCustomerReview, openReviewModal, deleteReview, submitReviewReply, showReviewSlide } from './reviews.js';
@@ -11,12 +15,22 @@ import { showScreen } from './router.js';
 import { toggleFavorite } from './favorites.js';
 import { openRestaurant, renderRestaurantMenu, loadRestaurant, renderRestaurants, loadRestaurants } from './restaurants.js';
 import { openCitySettings, saveBusinessProfile, saveProfile } from './profile.js';
-import { switchBizTab, loadDailyAnalytics, exportDailyAnalytics } from './business.js';
+import { switchBizTab, loadBusiness, loadDailyAnalytics, exportDailyAnalytics } from './business.js';
 import { showHomeBanner, toggleHomeBannerPlayback } from './home.js';
 import { loadTrainingData, downloadTrainingFile, resetTrainingImport, importTrainingFile, generateTrainingSample, saveTrainingSample } from './training.js';
 
 // Only these explicit actions can be invoked from static or generated markup.
 export const actions = {
+  loadBusiness: () => loadBusiness(),
+  dismissNotice: () => dismissNotice(),
+  toggleNavigation: () => toggleNavigation(),
+  openBusinessSignup: () => openBusinessSignup(),
+  selectBusinessPage: (event,node) => switchBizTab(node.value),
+  uploadItemHistory: (event,node) => openItemPricing(Number(node.dataset.arg0),true),
+  openItemPricing: (event,node) => openItemPricing(Number(node.dataset.arg0)),
+  importItemHistory: () => importItemHistory(),
+  trainItemModel: () => trainItemModel(),
+  useItemSample: () => useItemSample(),
   loadTrainingData: () => loadTrainingData(),
   downloadTrainingFile: (event,node) => downloadTrainingFile(node.dataset.arg0),
   resetTrainingImport: () => resetTrainingImport(),
@@ -113,7 +127,7 @@ export function installActions() {
       if (type === 'submit') event.preventDefault();
       Promise.resolve().then(() => actions[name](event, node)).catch(error => {
         console.error('PlateUp action failed:', name, error);
-        alert('Could not complete that action. ' + error.message);
+        notify('Could not complete that action. ' + error.message,'error');
       });
     });
   }

@@ -248,10 +248,10 @@ test('restaurant request failures remove stale meals and menus explain city rest
   assert.match(ui.node('restaurant-menu-grid').innerHTML,/another city/);
   ui.context.fetch=async()=>{ throw new Error('Offline'); };
   await ui.context.loadRestaurant();
-  assert.equal(ui.node('restaurant-menu-grid').innerHTML,'');
+  assert.match(ui.node('restaurant-menu-grid').innerHTML,/data-click="loadRestaurant"/);
   assert.match(ui.node('restaurant-menu-status').textContent,/Could not load restaurant/);
   await ui.context.loadRestaurants();
-  assert.equal(ui.node('restaurant-grid').innerHTML,'');
+  assert.match(ui.node('restaurant-grid').innerHTML,/data-click="loadRestaurants"/);
   assert.match(ui.node('restaurant-directory-status').textContent,/Could not load restaurants/);
 });
 

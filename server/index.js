@@ -11,6 +11,7 @@ const { expireOrders,expireLockedOrder } = require('./order-lifecycle');
 const { registerAccountSecurity } = require('./account-security');
 const { registerCustomerExperience } = require('./customer-experience');
 const { registerTrainingData } = require('./training-data');
+const { registerPricing,refreshPrices,withPricingReadiness } = require('./pricing');
 require('dotenv').config();
 
 const app = express();
@@ -22,9 +23,15 @@ app.use('/frontend', express.static(frontendDir, { dotfiles: 'deny' }));
 const foodUploadDir = path.join(__dirname, 'uploads', 'food');
 app.use('/uploads/food', express.static(foodUploadDir, { fallthrough:false,
   setHeaders:res => res.setHeader('X-Content-Type-Options','nosniff') }));
-app.get('/', (_, res) => res.sendFile(path.join(frontendDir, 'index.html')));
+// Only known UI routes receive the shell. APIs, assets and private files keep
+// their normal 404s instead of being hidden behind a catch-all HTML response.
+app.get(['/', '/login', '/browse-food', '/restaurants', '/restaurants/:id([1-9]\\d*)',
+  '/orders', '/favorites', '/profile', '/forgot-password', '/reset-password',
+  '/business', '/business/overview', '/business/listings', '/business/orders',
+  '/business/analytics', '/business/reviews', '/business/profile', '/business/training'],
+  (_, res) => res.sendFile(path.join(frontendDir, 'index.html')));
 app.get('/UI_PlateUp.html', (_, res) => res.redirect('/'));
-const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
+const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const clean = (value, max = 255) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const validId = value => Number.isSafeInteger(Number(value)) && Number(value) > 0;
 // Only trusted SQL column expressions are passed here. Empty cities never match.
@@ -33,6 +40,7 @@ const viewerCitySql = `(SELECT COALESCE(c.city_id,b.city_id) FROM users viewer
   LEFT JOIN businesses b ON b.user_id=viewer.id WHERE viewer.id=$1)`;
 const listingSql = `WITH clock AS (SELECT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka' AS local_now)
   SELECT l.id,l.title,l.description,l.category,l.business_id,l.original_price,l.rescue_price,
+    l.minimum_price,l.pricing_source,l.pricing_reason,l.pricing_updated_at,
     l.image_path,l.offer_start_time,l.offer_end_time,l.is_active,l.created_at,l.updated_at,
     b.business_name,b.address AS pickup_address,b.city,b.city_id,
     ratings.average_rating,COALESCE(ratings.review_count,0) AS review_count,
@@ -45,6 +53,8 @@ const listingSql = `WITH clock AS (SELECT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/D
       ELSE plateup_daily_status(a.offer_date,a.remaining_quantity,l.offer_start_time,
         l.offer_end_time,clock.local_now) END AS daily_status,
     a.offer_date + l.offer_start_time AS available_from,
+    (a.offer_date + l.offer_end_time + CASE WHEN l.offer_end_time<=l.offer_start_time
+      THEN INTERVAL '1 day' ELSE INTERVAL '0 day' END) AT TIME ZONE 'Asia/Dhaka' AS pickup_deadline,
     a.offer_date + l.offer_end_time + CASE WHEN l.offer_end_time<=l.offer_start_time
       THEN INTERVAL '1 day' ELSE INTERVAL '0 day' END AS available_until
   FROM listings l JOIN businesses b ON b.user_id=l.business_id
@@ -125,9 +135,15 @@ function auth(req, res, next) {
 const role = name => (req, res, next) => req.user.role === name ? next()
   : res.status(403).json({ message: 'This account cannot perform that action' });
 const optionalAuth = (req,res,next) => req.get('Authorization') ? auth(req,res,next) : next();
+app.use('/api',wrap(async(req,res,next)=>{
+  if ((req.method==='GET' && /^\/(listings|restaurants|favorites|business\/listings)(\/|$)/.test(req.path)) ||
+      (req.method==='POST' && ['/cart/quote','/orders'].includes(req.path))) await refreshPrices();
+  next();
+}));
 registerAccountSecurity(app,{auth,wrap});
 registerCustomerExperience(app,{auth,role,wrap,validId,listingSql,restaurantSql,viewerCitySql});
 registerTrainingData(app,{auth,role,wrap});
+registerPricing(app,{auth,role,wrap,validId});
 function publicOrder(order,user) {
   const { pickup_code,pickup_attempts,pickup_locked_until,...safe } = order;
   if (user.role==='customer' && user.userId===order.customer_id && ['pending','confirmed','ready'].includes(order.status))
@@ -296,7 +312,7 @@ app.get('/api/listings', optionalAuth, wrap(async (req,res) => {
 app.get('/api/business/listings', auth, role('business'), wrap(async (req,res) => {
   const result = await pool.query(`SELECT * FROM (${listingSql}) items
     WHERE business_id=$1 AND is_active=TRUE ORDER BY id DESC`,[req.user.userId]);
-  res.json(result.rows);
+  res.set('Cache-Control','private, no-store').json(await withPricingReadiness(req.user,result.rows));
 }));
 app.get('/api/business/listings/:id', auth, role('business'), wrap(async (req,res) => {
   if (!validId(req.params.id)) return res.status(400).json({ message:'Invalid item ID' });
@@ -317,13 +333,16 @@ app.get('/api/listings/:id', optionalAuth, wrap(async (req,res) => {
 
 async function listingInput(body) {
   const title = clean(body.title), category = typeof body.category==='string' ? body.category.trim() : '';
-  const original = Number(body.original_price), rescue = Number(body.rescue_price);
+  // Accept the old field as a minimum for existing API clients.
+  const minimum=body.minimum_price??body.rescue_price;
+  const original = Number(body.original_price), rescue = Number(minimum);
   const start = clean(body.offer_start_time,5), end = clean(body.offer_end_time,5);
-  if (!title || !category || body.original_price==='' || body.rescue_price==='' ||
-    !Number.isFinite(original) || original<0 ||
-    !Number.isFinite(rescue) || rescue<0 || rescue>original ||
+  if (!title || !category || body.original_price==='' || minimum==='' || minimum==null ||
+    !Number.isFinite(original) || original<0 || original>99999999.99 ||
+    !Number.isFinite(rescue) || rescue<0 || Math.round(rescue*100)>Math.floor(Math.round(original*100)*.8) ||
+    Math.abs(original*100-Math.round(original*100))>1e-6 || Math.abs(rescue*100-Math.round(rescue*100))>1e-6 ||
     !/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end))
-    return { error:'Enter a title, category, valid prices, and daily offer start/end times.' };
+    return { error:'Enter a title, category, valid offer times, and prices with at most two decimals. Minimum price must be at most 80% of original price.' };
   const saved=await pool.query('SELECT name FROM food_categories WHERE LOWER(name)=LOWER($1)',[category]);
   if (!saved.rows.length) return { error:'Choose a saved category, or use Add Category first.' };
   return { values:[title,saved.rows[0].name,clean(body.description,2000)||null,original,rescue,start,end] };
@@ -337,8 +356,8 @@ app.post('/api/listings', auth, role('business'), imageUpload.single('image'), w
     imagePath=await saveImage(req.file);
     const created = await pool.query(`INSERT INTO listings
       (business_id,business_name,title,category,description,original_price,rescue_price,
-       offer_start_time,offer_end_time,image_path,quantity,status,is_active)
-      SELECT b.user_id,b.business_name,$2,$3,$4,$5,$6,$7,$8,$9,0,'sold_out',TRUE
+       offer_start_time,offer_end_time,image_path,quantity,status,is_active,minimum_price)
+      SELECT b.user_id,b.business_name,$2,$3,$4,$5,$6,$7,$8,$9,0,'sold_out',TRUE,$6
       FROM businesses b WHERE b.user_id=$1 RETURNING id`,
       [req.user.userId,...parsed.values,imagePath]);
     imageCommitted=true;
@@ -356,10 +375,13 @@ app.put('/api/listings/:id', auth, role('business'), imageUpload.single('image')
   let imageCommitted=false;
   try {
     imagePath=await saveImage(req.file);
-    const updated = await pool.query(`UPDATE listings SET title=$1,category=$2,description=$3,
-      original_price=$4,rescue_price=$5,offer_start_time=$6,offer_end_time=$7,
+    const updated = await pool.query(`WITH changed AS (UPDATE listings SET title=$1,category=$2,description=$3,
+      original_price=$4,rescue_price=$5,minimum_price=$5,pricing_source='fallback',pricing_updated_at=NULL,
+      pricing_reason='Item settings changed. Review history and retrain.',offer_start_time=$6,offer_end_time=$7,
       image_path=COALESCE($8,image_path),updated_at=NOW()
-      WHERE id=$9 AND business_id=$10 AND is_active=TRUE RETURNING id`,
+      WHERE id=$9 AND business_id=$10 AND is_active=TRUE RETURNING id),
+      invalidated AS (DELETE FROM pricing_models WHERE listing_id IN (SELECT id FROM changed) RETURNING listing_id)
+      SELECT id FROM changed`,
       [...parsed.values,imagePath,req.params.id,req.user.userId]);
     if (!updated.rows.length) {
       await removeImage(imagePath);
@@ -408,6 +430,7 @@ app.put('/api/listings/:id/today', auth, role('business'), wrap(async (req,res) 
       await db.query('ROLLBACK');
       return res.status(409).json({ message:'Quantity cannot be less than units already reserved today.' });
     }
+    await db.query('UPDATE listings SET pricing_updated_at=NULL WHERE id=$1',[req.params.id]);
     await db.query('COMMIT');
     const result=await pool.query(`SELECT * FROM (${listingSql}) items WHERE id=$1`,[req.params.id]);
     res.json({ listing:result.rows[0] });
@@ -425,6 +448,7 @@ app.post('/api/cart/quote',auth,role('customer'),wrap(async (req,res)=>{
     const item=found.rows.find(row=>row.id===requested.listing_id);
     return { listing_id:requested.listing_id,quantity:requested.quantity,title:item?.title,
       business_name:item?.business_name,image_path:item?.image_path,pickup_deadline:item?.pickup_deadline,
+      pricing_source:item?.pricing_source,
       unit_price:item?Number(item.rescue_price):null,available_quantity:item?.quantity||0,
       total_price:item?Number((Number(item.rescue_price)*requested.quantity).toFixed(2)):0,
       error:!item?'No longer available in your city.':requested.quantity>item.quantity?
@@ -442,6 +466,7 @@ app.post('/api/orders', auth, role('customer'), wrap(async (req,res) => {
   try {
     await db.query('BEGIN');
     const orders=[];
+    await db.query('SELECT id FROM listings WHERE id=ANY($1::int[]) ORDER BY id FOR UPDATE',[items.map(item=>item.listing_id)]);
     for (const { listing_id:listingId,quantity,unit_price } of items) {
       const stock = await db.query(`UPDATE daily_availability a SET
         remaining_quantity=a.remaining_quantity-$1,updated_at=NOW()
@@ -625,18 +650,25 @@ app.delete('/api/reviews/:id', auth, role('customer'), wrap(async (req,res) => {
 }));
 
 app.get('/api/business/analytics', auth, role('business'), wrap(async (req,res) => {
-  const [summary,sales]=await Promise.all([
+  await expireOrders(req.user);
+  const [summary,sales,today]=await Promise.all([
     pool.query(`SELECT (SELECT COUNT(*)::int FROM (${listingSql}) items WHERE business_id=$1
         AND is_active=TRUE AND daily_status='Active') AS active_listings,
       (SELECT COALESCE(SUM(quantity_sold),0)::int FROM sales_data WHERE business_id=$1) AS meals_rescued,
       (SELECT COALESCE(SUM(price),0)::numeric FROM sales_data WHERE business_id=$1) AS revenue`,[req.user.userId]),
     pool.query(`SELECT s.id,s.listing_id,l.title,s.quantity_sold,s.price,s.sale_time FROM sales_data s
-      JOIN listings l ON l.id=s.listing_id WHERE s.business_id=$1 ORDER BY s.sale_time DESC LIMIT 50`,[req.user.userId])
+      JOIN listings l ON l.id=s.listing_id WHERE s.business_id=$1 ORDER BY s.sale_time DESC LIMIT 50`,[req.user.userId]),
+    pool.query(`WITH current_items AS (SELECT * FROM (${listingSql}) items WHERE business_id=$1)
+      SELECT (SELECT COALESCE(SUM(quantity),0)::int FROM current_items WHERE is_active AND daily_status IN ('Active','Scheduled for Today')) AS remaining_portions,
+        (SELECT COUNT(*)::int FROM orders WHERE daily_availability_id IN (SELECT daily_availability_id FROM current_items) AND status='pending') AS incoming_orders,
+        (SELECT COUNT(*)::int FROM orders WHERE daily_availability_id IN (SELECT daily_availability_id FROM current_items) AND status='completed') AS completed_pickups,
+        (SELECT COALESCE(SUM(total_price),0)::numeric FROM orders WHERE daily_availability_id IN (SELECT daily_availability_id FROM current_items) AND status='completed') AS revenue`,[req.user.userId])
   ]);
-  res.json({ summary:summary.rows[0],sales:sales.rows });
+  res.json({ summary:summary.rows[0],sales:sales.rows,today:today.rows[0] });
 }));
 app.get('/api/business/predictions', auth, role('business'), wrap(async (req,res) => {
-  const result=await pool.query('SELECT * FROM ml_predictions WHERE business_id=$1 ORDER BY prediction_date DESC',[req.user.userId]);
+  const result=await pool.query(`SELECT p.*,l.title AS listing_title FROM ml_predictions p
+    LEFT JOIN listings l ON l.id=p.listing_id WHERE p.business_id=$1 ORDER BY prediction_date DESC LIMIT 50`,[req.user.userId]);
   res.json(result.rows);
 }));
 
@@ -648,7 +680,8 @@ app.use((error,req,res,next) => {
     ['23503','23514','22P02'].includes(error.code) ? 400 : error.status || 500;
   if (status>=500) console.error(error);
   const message=error instanceof multer.MulterError && error.code==='LIMIT_FILE_SIZE'
-    ? 'Image must be 5 MB or smaller.' : error.status===400 ? error.message : 'Request could not be completed';
+    ? 'Image must be 5 MB or smaller.' : error.status && error.status<500 ? error.message :
+      error.status===503 && req.path.endsWith('/train') ? error.message : 'Request could not be completed';
   res.status(status).json({ message });
 });
 if (require.main===module) {
