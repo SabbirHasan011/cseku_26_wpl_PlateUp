@@ -758,21 +758,63 @@
 .sidebar .navitem.on { background:var(--green-100); }
 .auth-tab { background:transparent; border:0; border-bottom:2px solid transparent; font-family:inherit; min-height:44px; }
 .role-opt { font-family:inherit; min-height:44px; }
-.food-card .food-thumb { height:180px; }
-.food-card .food-thumb img { object-fit:contain; padding:8px; }
-.food-card .food-title { min-height:40px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:16px; }
-.food-card .biz-line { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.meal-facts { display:flex; align-items:center; flex-wrap:wrap; gap:8px; color:var(--ink-soft); font-size:12px; }
-.stock-badge { padding:5px 9px; border-radius:999px; background:var(--green-50); color:var(--green-900); font-weight:700; }
+/* Wide meal cards keep the photo and essentials together, with one action row. */
+#listing-grid,#restaurant-menu-grid,#favorite-meals,#home-featured-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.meal-card { display:grid; grid-template-columns:minmax(0,0.85fr) minmax(0,1.65fr); grid-template-rows:1fr auto; min-width:0; border-radius:18px; box-shadow:0 3px 14px rgba(27,67,50,0.04); }
+.meal-card:hover { border-color:#B1C7B7; box-shadow:0 8px 24px rgba(27,67,50,0.09); }
+.meal-photo { position:relative; min-width:0; margin:12px 0 12px 12px; border-radius:12px; overflow:hidden; background:#F0F2E8; }
+.meal-card .food-thumb { height:100%; min-height:160px; border:0; background:transparent; }
+.meal-card .food-thumb img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; padding:12px; }
+.meal-card .food-thumb .initial { font-size:42px; opacity:0.5; }
+.meal-card .save-pill { position:absolute; top:8px; left:8px; max-width:calc(100% - 16px); padding:6px 9px; border:1px solid #EDD6AC; border-radius:8px; background:#FBEBD2; color:#73501F; font:700 11px var(--font-body); box-shadow:0 2px 6px #1B433208; }
+.meal-card .food-body { min-width:0; padding:18px 16px 14px; gap:7px; justify-content:center; }
+.meal-card .biz-line { font-size:10px; letter-spacing:0.07em; color:var(--green-700); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.meal-card .food-title { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; font-size:19px; line-height:1.25; letter-spacing:-0.3px; color:var(--green-900); }
+.meal-card .item-rating { margin:1px 0 3px; gap:6px; }
+.meal-card .rating-stars { font-size:16px; gap:1px; }
+.meal-card .rating-caption { font-size:11px; }
+.meal-facts { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; color:var(--ink-soft); font-size:11px; }
+.stock-badge { padding:5px 8px; border-radius:6px; background:var(--green-50); color:var(--green-900); font-weight:700; }
 .stock-badge.low { background:var(--amber-100); color:#73501F; }
-.meal-pickup { margin:4px 0 8px; font-size:12px; color:var(--ink-soft); line-height:1.6; }
-.meal-pickup strong { display:block; color:var(--green-900); }
-.food-card .price-block { gap:3px; }
-.food-card .rescue-price { font-size:25px; letter-spacing:-1px; }
-.food-card .orig-price { color:var(--ink-soft); font-size:12px; }
-.food-card .save-pill { padding:7px 10px; font:700 12px var(--font-body); }
-.food-card .reserve-btn { min-height:44px; border-radius:10px; margin-top:8px; }
-.food-card .pricing-demo-label { min-height:18px; margin:0; font-size:11px; }
+.meal-city { overflow-wrap:anywhere; }
+.meal-pickup { display:flex; align-items:flex-start; gap:6px; margin:2px 0 0; font-size:11px; color:var(--ink-soft); line-height:1.5; }
+.meal-pickup svg { width:14px; height:14px; flex-shrink:0; margin-top:2px; color:var(--green-700); }
+.meal-pickup strong { color:var(--green-900); font-weight:600; }
+.meal-card-footer { grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:12px 16px; border-top:1px solid #E8ECE2; background:#FBFCF8; }
+.meal-card .price-block { min-width:0; gap:2px; }
+.meal-price-line { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 8px; }
+.meal-card .rescue-price { font-family:var(--font-body); font-size:25px; letter-spacing:-0.7px; }
+.meal-card .orig-price { color:var(--ink-soft); font-size:11px; }
+.meal-card .price-block small { font-size:10px; color:var(--ink-soft); }
+.meal-card-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
+.meal-card .reserve-btn { width:auto; min-height:44px; padding:10px 14px; border-radius:10px; margin:0; font-size:12px; white-space:nowrap; }
+.meal-card .reserve-btn span { margin-left:6px; }
+.meal-card .favorite-icon { display:grid; place-items:center; flex-shrink:0; width:44px; height:44px; margin:0; padding:10px; border-radius:10px; background:white; }
+.meal-card .favorite-icon:hover { background:var(--green-50); border-color:var(--green-700); }
+.meal-card .favorite-icon.saved { color:var(--coral-700); background:var(--coral-100); border-color:#E8B8AE; }
+.favorite-icon svg { width:20px; height:20px; }
+.meal-card .pricing-demo-label { margin:0; font-size:10px; }
+.meal-card .skeleton-media { height:auto; min-height:172px; }
+.meal-card-footer .skeleton-line { width:30%; }
+.meal-card-footer .skeleton-button { margin:0; width:120px; }
+@media(max-width:900px) {
+  #listing-grid,#restaurant-menu-grid,#favorite-meals,#home-featured-grid { grid-template-columns:minmax(0,1fr); }
+  .meal-card { grid-template-columns:minmax(0,1fr) minmax(0,2fr); }
+}
+@media(max-width:480px) {
+  .meal-card { grid-template-columns:104px minmax(0,1fr); border-radius:14px; }
+  .meal-photo { margin:10px 0 10px 10px; border-radius:9px; }
+  .meal-card .food-thumb img { padding:6px; }
+  .meal-card .food-body { padding:14px 12px; gap:6px; }
+  .meal-card .food-title { font-size:16px; }
+  .meal-card .save-pill { top:6px; left:6px; padding:5px 6px; font-size:10px; }
+  .meal-card-footer { padding:10px 12px; gap:8px; }
+  .meal-card .rescue-price { font-size:22px; }
+  .meal-card-actions { gap:6px; }
+  .meal-card .reserve-btn { padding:10px 12px; }
+  .meal-card .reserve-btn span { display:none; }
+}
+@media(prefers-reduced-motion:reduce) { .meal-card { transition:none; } .meal-card:hover { transform:none; } }
 .item-pricing-state { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:11px; color:var(--ink-soft); }
 .upload-history-btn { border:1px solid var(--green-700); border-radius:10px; min-height:44px; padding:10px 12px; background:var(--green-900); color:white; font:600 12px var(--font-body); cursor:pointer; }
 .upload-history-btn:hover { background:var(--green-700); }

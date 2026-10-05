@@ -53,14 +53,19 @@ export function foodCard(item) {
   const original=Number(item.original_price),price=Number(item.rescue_price);
   const discount=original>0?Math.max(0,Math.floor((1-price/original)*100+1e-9)):0;
   const quantity=Number(item.quantity)||0;
-  return '<div class="food-card">' + itemThumbnail(item) + '<div class="food-body"><div class="biz-line">' +
-    escapeHtml(item.business_name) + '</div><p class="food-title">' + escapeHtml(item.title) +
-    '</p>' + itemRating(item) + '<div class="meal-facts"><span class="stock-badge '+(quantity<=3?'low':'')+'">'+quantity+
-    ' portion'+(quantity===1?'':'s')+' left</span><span>'+escapeHtml(item.city||'Pickup')+'</span></div>'+
-    '<p class="meal-pickup"><span>Pick up by</span><strong>'+escapeHtml(pickupDeadline(item))+'</strong></p>'+
-    '<div class="ticket"><div class="price-block"><span class="rescue-price">'+money(item.rescue_price)+
-    '</span><span class="orig-price">'+money(item.original_price)+'</span></div><span class="save-pill">'+(discount?discount+'% off':'Rescue price')+
-    '</span></div>'+(item.pricing_source==='synthetic_model'?'<small class="pricing-demo-label">Demo model price</small>':'')+'<button class="reserve-btn" data-click="openListingDetails" data-arg0="' + item.id + '">View details</button>'+favoriteButton('listing',item.id)+'</div></div>';
+  return '<article class="food-card meal-card"><div class="meal-photo">'+itemThumbnail(item)+
+    '<span class="save-pill">'+(discount?discount+'% off':'Rescue price')+'</span></div>'+
+    '<div class="food-body"><div class="biz-line" title="'+escapeHtml(item.business_name)+'">'+escapeHtml(item.business_name)+'</div>'+
+    '<h3 class="food-title" title="'+escapeHtml(item.title)+'">'+escapeHtml(item.title)+'</h3>'+itemRating(item)+
+    '<div class="meal-facts"><span class="stock-badge '+(quantity<=3?'low':'')+'">'+quantity+' portion'+(quantity===1?'':'s')+
+    ' left</span><span class="meal-city">'+escapeHtml(item.city||'Pickup')+'</span></div>'+
+    '<p class="meal-pickup"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'+
+    '<span>Pick up by <strong>'+escapeHtml(pickupDeadline(item))+'</strong></span></p>'+
+    (item.pricing_source==='synthetic_model'?'<small class="pricing-demo-label">Demo model price</small>':'')+'</div>'+
+    '<div class="meal-card-footer"><div class="price-block"><div class="meal-price-line"><span class="rescue-price">'+money(item.rescue_price)+
+    '</span><del class="orig-price">'+money(item.original_price)+'</del></div><small>per portion</small></div>'+
+    '<div class="meal-card-actions">'+favoriteButton('listing',item.id,true)+
+    '<button type="button" class="reserve-btn" data-click="openListingDetails" data-arg0="'+item.id+'">View details <span aria-hidden="true">&rarr;</span></button></div></div></article>';
 }
 
 export function renderListings() {

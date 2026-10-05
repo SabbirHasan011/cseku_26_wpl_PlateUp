@@ -54,8 +54,18 @@ test('item history, actual training, pricing bounds, ownership and reservation s
     const current=(await call('/listings/'+id,'GET',undefined,customer.token)).body.listing;
     assert.equal(current.pricing_source,'synthetic_model');assert.ok(Number(current.rescue_price)>=60&&Number(current.rescue_price)<=160);
     assert.equal(await readiness(),'Model active');
+    // Requests before three minutes retain the previous calculation. Advancing
+    // only this fixture's timestamp exercises the real SQL gate without waiting.
+    const recent=(await pool.query("UPDATE listings SET pricing_updated_at=NOW()-INTERVAL '2 minutes' WHERE id=$1 RETURNING pricing_updated_at,rescue_price",[id])).rows[0];
+    const held=(await call('/listings/'+id,'GET',undefined,customer.token)).body.listing;
+    assert.equal(held.pricing_updated_at,recent.pricing_updated_at.toISOString());
+    assert.equal(held.rescue_price,recent.rescue_price);
+    const due=(await pool.query("UPDATE listings SET pricing_updated_at=NOW()-INTERVAL '181 seconds' WHERE id=$1 RETURNING pricing_updated_at",[id])).rows[0];
+    const refreshed=(await call('/listings/'+id,'GET',undefined,customer.token)).body.listing;
+    assert.ok(Date.parse(refreshed.pricing_updated_at)>due.pricing_updated_at.getTime());
+    assert.ok(Number(refreshed.rescue_price)>=60&&Number(refreshed.rescue_price)<=160);
     const quote=await call('/cart/quote','POST',{items:[{listing_id:id,quantity:1}]},customer.token);
-    assert.equal(quote.body.items[0].unit_price,Number(current.rescue_price));
+    assert.equal(quote.body.items[0].unit_price,Number(refreshed.rescue_price));
     assert.equal((await call('/orders','POST',{items:[{listing_id:id,quantity:1,unit_price:199}]},customer.token)).status,409);
     assert.equal((await pool.query('SELECT total_price FROM orders WHERE id=$1',[orderId])).rows[0].total_price,'60.00');
     const stored=(await pool.query('SELECT COUNT(*) FROM ml_predictions WHERE listing_id=$1',[id])).rows[0];assert.ok(Number(stored.count)>0);

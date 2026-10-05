@@ -14,7 +14,8 @@ export function notify(message,type='success') {
 }
 export function skeletonCards(count=3) {
   return '<div class="loading-label" role="status">Loading fresh finds…</div>'+Array.from({length:count},()=>
-    '<article class="food-card skeleton-card" aria-hidden="true"><div class="skeleton-media shimmer"></div>'+ 
-    '<div class="food-body"><div class="skeleton-line shimmer"></div><div class="skeleton-line long shimmer"></div>'+ 
-    '<div class="skeleton-line shimmer"></div><div class="skeleton-button shimmer"></div></div></article>').join('');
+    '<article class="food-card meal-card skeleton-card" aria-hidden="true"><div class="meal-photo skeleton-media shimmer"></div>'+
+    '<div class="food-body"><div class="skeleton-line shimmer"></div><div class="skeleton-line long shimmer"></div>'+
+    '<div class="skeleton-line shimmer"></div><div class="skeleton-line long shimmer"></div></div>'+
+    '<div class="meal-card-footer"><div class="skeleton-line shimmer"></div><div class="skeleton-button shimmer"></div></div></article>').join('');
 }

@@ -29,7 +29,7 @@ function trainPython(rows) {
 }
 
 // Runs on reads/checkout, not a scheduler. A DB timestamp bounds updates to once
-// per minute. Locks use the same listing -> inventory order as checkout/quantity.
+// every three minutes. Locks use the same listing -> inventory order as checkout/quantity.
 async function refreshPrices() {
   const db=await pool.connect();
   try {
@@ -43,7 +43,7 @@ async function refreshPrices() {
         WHEN l.offer_end_time<l.offer_start_time AND (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::time<l.offer_end_time
         THEN (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date-1 ELSE (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date END
       WHERE l.is_active AND l.minimum_price IS NOT NULL
-        AND (l.pricing_updated_at IS NULL OR l.pricing_updated_at<NOW()-INTERVAL '1 minute')
+        AND (l.pricing_updated_at IS NULL OR l.pricing_updated_at<=NOW()-INTERVAL '3 minutes')
       ORDER BY l.id FOR UPDATE OF l`)).rows;
     for(const item of rows) {
       if(item.daily_id) {

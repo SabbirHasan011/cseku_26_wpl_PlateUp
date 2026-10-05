@@ -29,7 +29,11 @@ No separate Python server or frontend build is needed.
    history**, then train with **Synthetic demo history** selected. This explicitly
    saves 180 reproducible observations in the isolated dataset, not sales/orders.
 6. Enter today's actual available portions as before. During the offer window,
-   marketplace/API requests refresh prices at most once per minute.
+   marketplace/API requests refresh prices at most once every three minutes.
+   Visible pages still fetch updates every 30 seconds. Recalculation happens on
+   the next relevant request after three minutes; it may return the same price.
+   Quantity updates, item edits and retraining reset the interval so the next
+   calculation can use the new settings immediately.
 
 New dates can be imported and the model retrained. Duplicates are rejected without
 overwriting historical rows. Existing generic imports are not silently matched by

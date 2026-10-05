@@ -6,9 +6,15 @@ import { el, escapeHtml } from './ui.js';
 import { showScreen } from './router.js';
 import { renderRestaurantMenu } from './restaurants.js';
 
-export function favoriteButton(kind,id) {
+export function favoriteButton(kind,id,compact=false) {
   if(state.currentUser?.role!=='customer') return '';
   const saved=state.favorites.saved.some(row=>(kind==='listing'?row.listing_id:row.business_id)===id);
+  if(compact) {
+    const label=saved?'Remove meal from favorites':'Save meal to favorites';
+    return '<button class="favorite-btn favorite-icon '+(saved?'saved':'')+'" type="button" aria-label="'+label+'" title="'+label+'" aria-pressed="'+saved+
+      '" data-click="toggleFavorite" data-arg0="'+kind+'" data-arg1="'+id+'"><svg aria-hidden="true" viewBox="0 0 24 24" fill="'+(saved?'currentColor':'none')+
+      '" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg></button>';
+  }
   return '<button class="favorite-btn '+(saved?'saved':'')+'" type="button" aria-pressed="'+saved+'" data-click="toggleFavorite" data-arg0="'+kind+'" data-arg1="'+id+'">'+
     (saved?'♥ Saved':'♡ Save')+'</button>';
 }
