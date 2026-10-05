@@ -32,8 +32,8 @@ No separate Python server or frontend build is needed.
    marketplace/API requests refresh prices at most once every three minutes.
    Visible pages still fetch updates every 30 seconds. Recalculation happens on
    the next relevant request after three minutes; it may return the same price.
-   Quantity updates, item edits and retraining reset the interval so the next
-   calculation can use the new settings immediately.
+   Quantity updates and retraining request a refresh but cannot bypass the daily
+   three-minute reduction limit. Each new daily offer has its own pricing state.
 
 New dates can be imported and the model retrained. Duplicates are rejected without
 overwriting historical rows. Existing generic imports are not silently matched by
@@ -55,29 +55,61 @@ At least 30 eligible distinct offer dates, positive quantity/original price, and
 three distinct price ratios are required. The earliest 80% train an evaluation
 model; the latest 20% test it. MAE is reported in portions, alongside a baseline
 using the training period's mean collected fraction. If Ridge does not beat or
-match that baseline, fallback remains active. The final model is refitted on all
+match that baseline, time-based pricing remains active. The final model is refitted on all
 eligible rows. Coefficients and evaluation metadata are stored as JSON in
 `pricing_models`, avoiding uploaded pickle/joblib executables. Node uses the same
 feature transformation and exported coefficients for inexpensive inference.
 See the official [Ridge documentation](https://scikit-learn.org/1.8/modules/generated/sklearn.linear_model.Ridge.html).
 
-For an active offer the pricing policy evaluates 21 candidate prices, rounded to
-cents, **between minimum and floor(original × 0.80 to cents)**. It only evaluates
-ratios within the trained range. Predicted collection fraction × initial quantity
-estimates full-window sales. The policy blends that with observed committed-order
-pace (75% model / 25% pace; pace used only after 10% of the window), then scales by
-remaining window time and caps by stock. Candidates maximize expected revenue
-plus an explicit waste-reduction value per rescued portion:
-`expected portions × (candidate price + minimum price × (1 + 4 × elapsed fraction))`.
-This remaining-time/pace adjustment and objective are **policy assumptions**, not
-separately learned models. No claim of optimal or causal price elasticity is made.
+Policy version 3 uses **whole taka** and opens a new daily offer at
+**floor(original × 0.80)**. Item creation/editing requires whole original and
+minimum prices. Existing fractional effective prices round down on the next
+relevant request, within the price boundaries; historical orders remain unchanged.
+Legacy fractional minimums round up for pricing. If no whole price fits a legacy
+item's boundaries, that item reports a settings error without blocking other items.
+The time schedule interpolates from that opening price to the restaurant minimum
+over the offer window. Relevant API requests review prices at most once every
+three minutes. Missed reviews are not replayed as a burst of discounts. The first
+active calculation establishes the opening price, even if stock was entered late.
 
-The fallback is the restaurant's minimum. It applies without a usable model,
-outside active hours, without stock, or outside the historical price range.
-Fallbacks never create fake prediction records. Model price changes are saved in
-`ml_predictions` with source/details and in the existing price event journal.
-Synthetic model prices are visibly labelled in management, marketplace cards,
-meal details and the price-history report. Model errors are not confidence scores.
+After 10% of the window, net committed portions divided by initial quantity and
+elapsed fraction measures reservation pace. Pace at least 1 holds the price.
+Once reservations have occurred, stock at or below max(2 portions, ceil(15% of
+initial stock)) also holds it. A small initial offer with no orders still declines.
+Pace below 0.75 with substantial stock advances the discount by up to 10% of the
+opening-to-minimum spread, scaled by elapsed time. During the final 15%, slow
+offers move toward the minimum. These are prototype policy settings.
+
+The existing Ridge still predicts full-offer collection fraction, not interval
+demand. A usable model within its observed price range can adjust the schedule by
+at most 10% of the opening-to-minimum difference, scaled by elapsed time.
+For original ৳300/minimum ৳170 the maximum model adjustment is ৳7.
+Unsupported or unsuitable models use the time schedule without ML assistance.
+
+Each review may lower price by at most floor(5% of original price to whole taka),
+with a one-taka minimum step for inexpensive items. Whole-taka rounding may keep
+successive reviews at the same price. Prices never increase automatically and never fall
+below the minimum. Strong sales can keep prices above the minimum at closing.
+Explicit edits of original/minimum price can require clamping to new legal
+bounds. Confirmed reservation prices remain unchanged.
+
+Migration 007 adds last_price and last_priced_at to daily_availability. Quantity
+edits, retraining, restarts and cancellations do not clear this daily state.
+Every new offer date has its own opening price. Migration preserves prices
+already advertised in existing offers, including offers already at their minimum;
+these items get the opening rule with their next daily offer.
+
+The active offer's last_priced_at controls its next review independently of the
+listing's general refresh timestamp, so quantity edits and retraining cannot delay
+a due review. Manage Listings shows each item's pricing reason. Items at their
+minimum, scheduled/closed offers, missing stock and strong sales may legitimately
+keep the same price; refreshing does not reset them to a higher price.
+
+Time-only decisions use pricing_source=time_policy and create no fake
+ml_predictions. Actual assistance uses model or synthetic_model; prediction
+records include the policy version, baseline and model signal. Price changes
+continue through the event journal. Synthetic assistance is labelled.
+Model errors are not confidence scores.
 
 ## Integrity and compatibility
 
@@ -96,7 +128,7 @@ meal details and the price-history report. Model errors are not confidence score
   is required. Existing frontend polling discovers price changes. The read-triggered
   refresher serializes pricing writers with a database advisory lock.
 - Training is limited to two concurrent jobs in a Node process, 5,000 rows, and
-  60 seconds. Missing Python/packages returns a useful error; marketplace fallback
+  60 seconds. Missing Python/packages returns a useful error; time-based pricing
   or the previous trained model continues to work.
 
 New business-only endpoints:

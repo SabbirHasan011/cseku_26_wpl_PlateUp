@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { loadRecommendations } from './recommendations.js';
 import { notify,dismissNotice } from './feedback.js';
 import { toggleNavigation } from './ui.js';
 import { openBusinessSignup } from './auth.js';
@@ -21,6 +22,7 @@ import { loadTrainingData, downloadTrainingFile, resetTrainingImport, importTrai
 
 // Only these explicit actions can be invoked from static or generated markup.
 export const actions = {
+  loadRecommendations: () => loadRecommendations(),
   loadBusiness: () => loadBusiness(),
   dismissNotice: () => dismissNotice(),
   toggleNavigation: () => toggleNavigation(),

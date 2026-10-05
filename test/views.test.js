@@ -18,6 +18,7 @@ async function setup() {
       const responses={ '/api/listings':[], '/api/reviews':[], '/api/categories':[{id:1,name:'Bakery'}],'/api/cities':[{id:1,name:'Dhaka'}],
         '/api/orders':[], '/api/restaurants':[], '/api/notifications':{notifications:[],unread_count:0},
         '/api/favorites':{saved:[],restaurants:[],listings:[]}, '/api/business/listings':[],
+        '/api/recommendations':{mode:'local',listings:[]},
         '/api/business/analytics':{summary:{active_listings:0,meals_rescued:0,revenue:0},sales:[]}, '/api/business/predictions':[] };
       if(!Object.hasOwn(responses,url))throw Error('Unexpected API '+url);
       return {ok:true,headers:{get:()=> 'application/json'},json:async()=>responses[url]};
@@ -246,11 +247,15 @@ test('business overview uses API daily totals, separates the menu, and exposes i
   await c.showScreen('business');
   const n=id=>ui.document.getElementById(id);
   assert.equal(n('biz-today-portions').textContent,15);assert.equal(n('biz-today-incoming').textContent,3);
-  assert.equal(n('biz-today-pickups').textContent,2);assert.equal(n('biz-today-revenue').textContent,'৳600.00');
+  assert.equal(n('biz-today-pickups').textContent,2);assert.equal(n('biz-today-revenue').textContent,'৳600');
   assert.match(n('business-next-steps').innerHTML,/1 food item needs/);
   assert.match(n('business-next-steps').innerHTML,/3 incoming orders/);
   assert.match(n('business-listings').innerHTML,/Upload Sales History/);
   assert.match(n('business-listings').innerHTML,/Ready to train/);
+  assert.match(n('business-listings').innerHTML,/aria-label="50% discount">-50%/);
+  item.rescue_price=180;c.renderListings();
+  assert.match(n('business-listings').innerHTML,/aria-label="40% discount">-40%/);
+  assert.match(n('business-listings').innerHTML,/<strong>৳180<\/strong>/);
   assert.equal(n('biz-tab-listings').style.display,'none');
   n('business-mobile-tab').value='listings';await c.actions.selectBusinessPage({},n('business-mobile-tab'));
   assert.equal(n('biz-tab-overview').style.display,'none');assert.equal(n('biz-tab-listings').style.display,'block');
@@ -271,14 +276,19 @@ test('mobile menu, business signup and dismissible feedback are accessible throu
   c.actions.dismissNotice();assert.equal(n('app-notice').hidden,true);assert.deepEqual(ui.errors,[]);
 });
 
-test('meal cards show accurate discounts and Bangladesh pickup dates, including a midnight deadline',async()=>{
+test('meal cards show current prices and Bangladesh pickup dates, including a midnight deadline',async()=>{
   const ui=await setup(),c=ui.context;
   const card=c.foodCard({id:7,title:'<Biryani>',business_name:'Kitchen',original_price:300,rescue_price:239.99,quantity:2,
     city:'Dhaka',offer_end_time:'00:00',pickup_deadline:'2026-10-03T18:00:00.000Z'});
-  assert.match(card,/৳239\.99/);assert.match(card,/20% off/);assert.match(card,/2 portions left/);
+  assert.match(card,/৳239\.99/);assert.match(card,/৳300/);assert.match(card,/2 available/);
   assert.match(card,/4 Oct/);assert.match(card,/12:00 am BST/);assert.match(card,/&lt;Biryani&gt;/);
   assert.equal((card.match(/class="rating-star"/g)||[]).length,5);
-  assert.match(c.foodCard({id:8,title:'Meal',original_price:300,rescue_price:148,quantity:1,offer_end_time:'23:00'}),/50% off/);
+  assert.match(card,/data-click="openListingDetails" data-arg0="7"/);
+  assert.match(card,/aria-label="20% discount">-20%/);
+  const wholePriceCard=c.foodCard({id:8,title:'Meal',original_price:300,rescue_price:148,quantity:1,offer_end_time:'23:00'});
+  assert.match(wholePriceCard,/<span class="rescue-price">৳148<\/span>/);
+  assert.match(wholePriceCard,/aria-label="50% discount">-50%/);
+  assert.doesNotMatch(c.foodCard({id:9,title:'Meal',original_price:0,rescue_price:0,quantity:1}),/class="save-pill"|NaN/);
 });
 
 test('loading meal cards are replaced with an actionable error, then recover on retry',async()=>{
@@ -291,4 +301,62 @@ test('loading meal cards are replaced with an actionable error, then recover on 
   release();await loading;assert.match(grid.innerHTML,/data-click="refreshMarketplace"/);assert.doesNotMatch(grid.innerHTML,/skeleton-card/);
   assert.equal(grid.getAttribute('aria-busy'),'false');
   c.fetch=fetch;await c.refreshMarketplace();assert.match(grid.innerHTML,/Sign in/);assert.doesNotMatch(grid.innerHTML,/could not be loaded/);
+});
+
+test('homepage recommendations show reasons and retain meal details, portions, cart and favorite actions',async()=>{
+  const ui=await setup(),c=ui.context,n=id=>ui.document.getElementById(id),fetch=c.fetch;
+  await c.showScreen('home');assert.equal(n('home-recommendations').hidden,true);
+  c.state.currentUser={id:1,name:'Customer',role:'customer'};c.state.token='session';c.state.profile={};
+  await c.loadRecommendations();assert.equal(n('home-recommendations').hidden,false);
+  assert.match(n('recommendation-grid').innerHTML,/Set my city/);
+  const item={id:71,title:'Recommended bread',category:'Bakery',business_id:2,business_name:'Kitchen',city:'Dhaka',
+    quantity:5,original_price:200,rescue_price:148,offer_start_time:'00:00',offer_end_time:'00:00',
+    recommendation_reason:'<Saved meal>'};
+  let recommendationCalls=0;
+  c.fetch=async(url,options)=>{
+    if(url==='/api/recommendations') {recommendationCalls++;return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({mode:'personalized',listings:[item]})};}
+    if(url==='/api/listings/71')return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({listing:item})};
+    return fetch(url,options);
+  };
+  c.state.profile={customer_city:'Dhaka',customer_city_id:1};await c.loadRecommendations();
+  assert.match(n('recommendation-grid').innerHTML,/Recommended bread/);
+  assert.match(n('recommendation-grid').innerHTML,/&lt;Saved meal&gt;/);
+  assert.match(n('recommendation-grid').innerHTML,/data-click="toggleFavorite"/);
+  assert.match(n('recommendation-status').textContent,/completed orders/);
+  await c.actions.openListingDetails({}, {dataset:{arg0:'71'}});
+  assert.equal(n('listing-detail-modal').classList.contains('active'),true);
+  n('detail-quantity').value='3';c.reserveDetail({preventDefault(){}});
+  assert.equal(c.state.cartItems.length,3);assert.equal(c.state.cartItems[0].price,148);
+  assert.equal(n('checkout-modal').classList.contains('active'),false);
+  await c.loadFavorites();assert.equal(recommendationCalls,2,'Favorites refresh recommendations');
+  c.handleLogout();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(n('home-recommendations').hidden,true);assert.equal(c.state.recommendations.length,0);
+  assert.equal(n('recommendation-grid').innerHTML,'','Logout also removes personal suggestions from the cached DOM');
+  assert.deepEqual(ui.errors,[]);
+});
+
+test('recommendations handle errors, retries, empty results and stale city/account responses safely',async()=>{
+  const ui=await setup(),c=ui.context,n=id=>ui.document.getElementById(id),fetch=c.fetch;
+  c.state.currentUser={id:1,name:'Customer',role:'customer'};c.state.token='first';
+  c.state.profile={customer_city:'Dhaka',customer_city_id:1};await c.ensureView('home');
+  let release,mode='error';
+  c.fetch=async(url,options)=>{
+    if(url!=='/api/recommendations')return fetch(url,options);
+    if(mode==='pending')return new Promise(resolve=>release=resolve);
+    return mode==='error'?{ok:false,status:503,headers:{get:()=> 'application/json'},json:async()=>({message:'<Offline>'})}:
+      {ok:true,headers:{get:()=> 'application/json'},json:async()=>({mode:'local',listings:[]})};
+  };
+  await c.loadRecommendations();assert.match(n('recommendation-grid').innerHTML,/&lt;Offline&gt;/);
+  assert.match(n('recommendation-grid').innerHTML,/data-click="loadRecommendations"/);
+  mode='empty';await c.actions.loadRecommendations();assert.match(n('recommendation-grid').innerHTML,/No suggestions/);
+  mode='pending';const old=c.loadRecommendations();assert.match(n('recommendation-grid').innerHTML,/skeleton-card/);
+  c.state.profile={customer_city:'Khulna',customer_city_id:2};c.renderRecommendations();
+  release({ok:true,headers:{get:()=> 'application/json'},json:async()=>({mode:'personalized',listings:[{id:1,title:'Wrong-city meal'}]})});
+  await old;assert.equal(c.state.recommendations.length,0);assert.doesNotMatch(n('recommendation-grid').innerHTML,/Wrong-city/);
+  const previousAccount=c.loadRecommendations();c.state.token='second';c.state.currentUser={id:2,name:'New customer',role:'customer'};
+  release({ok:false,status:401,headers:{get:()=> 'application/json'},json:async()=>({message:'Old session expired'})});
+  await previousAccount;assert.equal(c.state.token,'second','A stale unauthorized response cannot sign out the new account');
+  assert.equal(c.state.currentUser.id,2);assert.equal(c.state.recommendations.length,0);
+  c.state.currentUser={id:3,role:'business'};c.renderRecommendations();assert.equal(n('home-recommendations').hidden,true);
+  assert.deepEqual(ui.errors,[]);
 });

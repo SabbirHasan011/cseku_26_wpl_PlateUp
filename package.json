@@ -8,6 +8,7 @@
     "dev": "node server/index.js",
     "db:migrate": "node server/migrate.js",
     "data:generate": "node tools/generate-training-data.js",
+    "data:scenarios": "node tools/generate-sales-scenarios.js",
     "test": "node --experimental-vm-modules --test --test-isolation=none"
   },
   "keywords": [

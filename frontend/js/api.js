@@ -5,12 +5,13 @@ export const API_BASE = location.protocol !== 'file:' && location.port !== '5500
   'http://' + (location.hostname || 'localhost') + ':5000/api';
 
 export async function requestJson(path, options = {}) {
+  const session = state.token;
   let response;
   try {
     response = await fetch(API_BASE + path, {
       ...options,
       headers: { ...(options.body instanceof FormData ? {} : { 'Content-Type':'application/json' }),
-        ...(state.token ? { Authorization:'Bearer ' + state.token } : {}), ...(options.headers || {}) }
+        ...(session ? { Authorization:'Bearer ' + session } : {}), ...(options.headers || {}) }
     });
   } catch (error) {
     throw new Error('Cannot connect to PlateUp at ' + API_BASE + '. Run npm start, then open http://localhost:5000/.');
@@ -25,7 +26,7 @@ export async function requestJson(path, options = {}) {
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if (response.status === 401 && state.token && !path.startsWith('/auth/')) handleLogout();
+    if (response.status === 401 && session && session === state.token && !path.startsWith('/auth/')) handleLogout();
     const error = new Error(data.message || 'Request failed');
     error.details = data;
     throw error;

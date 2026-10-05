@@ -11,11 +11,12 @@ import { readPageUrl } from './page-urls.js';
 import { loadAccount, captureResetLink } from './auth.js';
 import { loadInitialData } from './marketplace.js';
 import { refreshOrderActivity } from './notifications.js';
+import { refreshOpenItemPricing } from './pricing.js';
 
 export function refreshVisibleData() {
   if (document.visibilityState==='hidden' || !hasView(state.activeScreen)) return;
   if (state.activeScreen==='home' || state.activeScreen==='customer') refreshMarketplace();
-  if (state.activeScreen==='business') refreshBusinessListings();
+  if (state.activeScreen==='business') { refreshBusinessListings(); refreshOpenItemPricing(); }
   if (state.activeScreen==='restaurants') loadRestaurants();
   if (state.activeScreen==='restaurant') loadRestaurant();
   if (state.activeScreen==='favorites') loadFavorites();

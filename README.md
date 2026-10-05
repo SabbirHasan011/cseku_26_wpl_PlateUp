@@ -36,7 +36,8 @@ The app is designed around a simple pickup-based marketplace model:
 - Track business orders from pending to completed
 - View sales summaries and business analytics
 - Overview shows current daily offer stock, pending orders, completed pickups and collected revenue, with shortcuts to daily quantities and orders. Lifetime totals remain separate.
-- Manage Listings has a visible Upload Sales History action per item and server-derived History needed / Ready to train / Model active / Fallback active labels. Training readiness requires 30 eligible offer dates and at least three price ratios; synthetic models remain labelled demonstrations.
+- Manage Listings has a visible Upload Sales History action per item and server-derived History needed / Ready to train / Model active / Baseline active labels. Training readiness requires 30 eligible offer dates and at least three price ratios; synthetic models remain labelled demonstrations.
+- Daily offers use whole-taka prices, open at 20% off, then follow gradual time-based reductions with bounded ML assistance. Prices are reviewed every three minutes and held for strong reservations, low stock or a reached minimum. Each reduction is limited to 5% of original price rounded down, with a one-taka minimum step. Manage Listings shows the pricing reason. The time policy works without a model; confirmed order prices are preserved.
 
 ### Customer features
 - Search and browse active listings from restaurants matching your selected city; customer and business profiles use a shared city catalog
@@ -108,7 +109,7 @@ page. Restart `npm start` after updating the server routes. With VS Code Live Se
 on port 5500, navigation uses `frontend/index.html#/...` because that static server
 does not handle the Express page routes.
 
-Item-specific sales regression and bounded dynamic pricing are implemented. Python/scikit-learn trains a model from an item's eligible history; Node applies its coefficients and the remaining-time pricing policy. Synthetic models are labelled demonstrations. Personalized recommendations and surplus prediction remain unimplemented. See [ML setup, workflow and limitations](docs/ml-pricing.md).
+Item-specific sales regression and bounded dynamic pricing are implemented. Python/scikit-learn trains a model from an item's eligible history; Node applies its coefficients and the remaining-time pricing policy. Synthetic models are labelled demonstrations. Customer recommendations use completed orders, favorites and reviews through deterministic rules, without ML; see [recommendation behavior](docs/recommendations.md). Surplus prediction remains unimplemented. See [ML setup, workflow and limitations](docs/ml-pricing.md).
 
 ## Project structure
 
@@ -121,7 +122,6 @@ Item-specific sales regression and bounded dynamic pricing are implemented. Pyth
 │   ├── components/             # Navbar and shared dialogs
 │   ├── css/styles.css          # Existing styling
 │   └── js/                     # Native ES modules grouped by responsibility
-├── assets/js/data.js           # Archived fixtures; not loaded by the app
 ├── server/                     # Express APIs, PostgreSQL, migrations, uploads
 ├── test/                       # API, frontend behavior, views and static-serving tests
 │   └── helpers/                # Isolated ES-module loader and DOM test double
@@ -296,7 +296,7 @@ This project is a functional MVP and still has several planned future improvemen
 - No admin dashboard
 - No full delivery logistics system
 - No dynamic rescue pricing engine
-- Pricing model is an academic prototype; no personalized recommendation engine or real-world performance validation yet
+- Pricing model is an academic prototype; recommendations are rule-based, with no real-world performance validation yet
 - Limited geographic mapping features
 
 ## Roadmap

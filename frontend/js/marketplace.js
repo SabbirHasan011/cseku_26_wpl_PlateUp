@@ -1,12 +1,13 @@
 import { renderBusinessListings } from './listings.js';
 import { state } from './state.js';
 import { requestJson } from './api.js';
-import { el, itemThumbnail, escapeHtml, itemRating, offerTime, money, imageUrl, closeModal,pickupDeadline } from './ui.js';
+import { el, itemThumbnail, escapeHtml, itemRating, offerTime, money, imageUrl, closeModal,pickupDeadline,discountBadge,discountPercent } from './ui.js';
 import { notify,skeletonCards } from './feedback.js';
 import { renderReviews, renderHomeReviews } from './reviews.js';
 import { favoriteButton } from './favorites.js';
 import { profileCity } from './profile.js';
 import { addToCart } from './cart.js';
+import { loadRecommendations, renderRecommendations } from './recommendations.js';
 
 export async function fetchListings() {
   const requestId = ++state.latestListingsRequest;
@@ -28,6 +29,7 @@ export async function fetchListings() {
     state.detailItem = state.listings.find(item => item.id === state.detailItem.id) || { ...state.detailItem,quantity:0 };
     updateDetailQuantity();
   }
+  await loadRecommendations();
 }
 
 export async function refreshMarketplace() {
@@ -50,22 +52,14 @@ export async function loadInitialData() {
 }
 
 export function foodCard(item) {
-  const original=Number(item.original_price),price=Number(item.rescue_price);
-  const discount=original>0?Math.max(0,Math.floor((1-price/original)*100+1e-9)):0;
-  const quantity=Number(item.quantity)||0;
-  return '<article class="food-card meal-card"><div class="meal-photo">'+itemThumbnail(item)+
-    '<span class="save-pill">'+(discount?discount+'% off':'Rescue price')+'</span></div>'+
-    '<div class="food-body"><div class="biz-line" title="'+escapeHtml(item.business_name)+'">'+escapeHtml(item.business_name)+'</div>'+
-    '<h3 class="food-title" title="'+escapeHtml(item.title)+'">'+escapeHtml(item.title)+'</h3>'+itemRating(item)+
-    '<div class="meal-facts"><span class="stock-badge '+(quantity<=3?'low':'')+'">'+quantity+' portion'+(quantity===1?'':'s')+
-    ' left</span><span class="meal-city">'+escapeHtml(item.city||'Pickup')+'</span></div>'+
-    '<p class="meal-pickup"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'+
-    '<span>Pick up by <strong>'+escapeHtml(pickupDeadline(item))+'</strong></span></p>'+
-    (item.pricing_source==='synthetic_model'?'<small class="pricing-demo-label">Demo model price</small>':'')+'</div>'+
-    '<div class="meal-card-footer"><div class="price-block"><div class="meal-price-line"><span class="rescue-price">'+money(item.rescue_price)+
-    '</span><del class="orig-price">'+money(item.original_price)+'</del></div><small>per portion</small></div>'+
-    '<div class="meal-card-actions">'+favoriteButton('listing',item.id,true)+
-    '<button type="button" class="reserve-btn" data-click="openListingDetails" data-arg0="'+item.id+'">View details <span aria-hidden="true">&rarr;</span></button></div></div></article>';
+  return '<div class="food-card">' + itemThumbnail(item) + '<div class="food-body"><div class="biz-line" title="' +
+    escapeHtml(item.business_name) + '">' + escapeHtml(item.business_name) + '</div><p class="food-title" title="' + escapeHtml(item.title) + '">' + escapeHtml(item.title) +
+    '</p>' + itemRating(item) + '<div class="food-meta">' + item.quantity + ' available · ' + escapeHtml(item.city || 'Pickup') +
+    ' · Ends ' + escapeHtml(pickupDeadline(item)) + '</div>' +
+    (item.pricing_source==='synthetic_model'?'<small class="pricing-demo-label">Demo model price</small>':'') +
+    '<div class="ticket"><div class="card-price-reference"><span class="orig-price">' + money(item.original_price) +
+    '</span>'+discountBadge(item)+'</div><div class="card-price"><span class="rescue-price">' + money(item.rescue_price) +
+    '</span><small class="card-price-unit">/ portion</small></div></div><div class="food-card-actions"><button class="reserve-btn" data-click="openListingDetails" data-arg0="' + item.id + '">View details</button>'+favoriteButton('listing',item.id)+'</div></div></div>';
 }
 
 export function renderListings() {
@@ -95,6 +89,7 @@ export function renderListings() {
       '<div class="empty-history feed-empty"><strong>' + (!state.currentUser ? 'Find food in your city' : !profileCity() ? 'Where would you like to pick up?' : 'No available meals in ' + escapeHtml(profileCity())) + '</strong><p>' + (!state.currentUser ? 'Sign in and save your city to discover local meals.' : !profileCity() ? 'Add your city to your profile to see food from local restaurants.' : 'Try again when restaurants add portions during their offer hours.') + '</p><button class="btn-sec" data-click="openCitySettings">' + (!state.currentUser ? 'Sign in' : profileCity() ? 'Change city' : 'Set my city') + '</button></div>';
   }
   renderBusinessListings();
+  renderRecommendations();
 }
 
 export function filterListings() { renderListings(); }
@@ -125,7 +120,7 @@ export async function openListingDetails(id) {
     if (index >= 0) state.listings[index] = item;
     el('detail-title').textContent = item.title;
     el('detail-category').textContent = item.category + (item.pricing_source==='synthetic_model'?' / Demo model price':' / Rescue meal');
-    const savings = Number(item.original_price) > 0 ? Math.floor((1-Number(item.rescue_price)/Number(item.original_price))*100+1e-9) : 0;
+    const savings = discountPercent(item) || 0;
     el('detail-media').innerHTML = (item.image_path ? '<img src="' + escapeHtml(imageUrl(item.image_path)) +
       '" alt="' + escapeHtml(item.title) + '">' : '<div class="detail-placeholder"><span aria-hidden="true">&#127858;</span><span>A good meal. A little less waste.</span></div>') +
       (savings > 0 ? '<span class="detail-savings">Save ' + savings + '%</span>' : '');

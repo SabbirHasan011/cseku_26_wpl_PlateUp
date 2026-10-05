@@ -81,4 +81,9 @@ All require business authentication and enforce business ownership:
 
 ## Remaining work
 
+For more varied per-item histories and experimental three-minute observations,
+see [synthetic sales scenarios](synthetic-sales-scenarios.md). The item pricing
+dialog now uses these varied daily assumptions for new demo imports. The generic
+Data preparation generator remains available for the original simple examples.
+
 The item pricing module now implements daily sales regression, chronological evaluation, a price policy, minimum-price controls and marketplace integration. Interval dataset construction remains future work: the daily model uses eligible stable-price offers, while dynamic-offer evaluation will need event history and real observations. Do not use same-offer collected/remaining quantities as inputs to a prediction made before the offer. Old price history cannot be reconstructed by adding more synthetic records.

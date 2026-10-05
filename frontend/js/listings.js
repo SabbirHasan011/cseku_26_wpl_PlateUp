@@ -1,4 +1,4 @@
-import { itemThumbnail, itemRating, money } from './ui.js';
+import { itemThumbnail, itemRating, money,discountBadge } from './ui.js';
 import { pricingLabel,itemPricingStatus } from './pricing.js';
 import { notify } from './feedback.js';
 import { state } from './state.js';
@@ -197,9 +197,9 @@ export async function submitNewListing() {
   const original=Number(el('m-orig-price').value);
   const rescue=Number(el('m-rescue-price').value);
   if (!title || !el('m-orig-price').value || !el('m-rescue-price').value ||
-    !Number.isFinite(original) || original<0 || !Number.isFinite(rescue) || rescue<0 || Math.round(rescue*100)>Math.floor(Math.round(original*100)*.8) ||
+    !Number.isSafeInteger(original) || original<0 || !Number.isSafeInteger(rescue) || rescue<0 || rescue>Math.floor(original*.8) ||
     !el('m-start').value || !el('m-end').value) {
-    return showError('Enter a title, valid offer times, and prices. Minimum price must be at most 80% of original price (at least 20% off).');
+    return showError('Enter a title, valid offer times, and whole-taka prices. Minimum price must be at most 80% of original price (at least 20% off).');
   }
   const payload=new FormData();
   Object.entries({ title,category:el('m-category').value,description:el('m-description').value,
@@ -265,18 +265,19 @@ export function renderBusinessListings() {
       '<div class="manage-item-top">' + itemThumbnail(item) + '<div class="manage-item-heading"><span class="manage-category">' +
       escapeHtml(item.category) + '</span><h4>' + escapeHtml(item.title) + '</h4>' + itemRating(item) + '</div></div>' +
       '<div class="manage-item-facts"><div><span class="manage-label">Price per portion</span><div class="manage-prices"><strong>' +
-      money(item.rescue_price) + '</strong><del title="Original price">' + money(item.original_price) + '</del></div></div>' +
+      money(item.rescue_price) + '</strong><del title="Original price">' + money(item.original_price) + '</del>'+discountBadge(item)+'</div></div>' +
       '<div><span class="manage-label">Daily offer</span><strong class="manage-window">' + offerTime(item.offer_start_time) +
       ' – ' + offerTime(item.offer_end_time) + '</strong></div></div>' +
       '<div class="manage-inventory"><div><span>Made available</span><strong>' + (item.initial_quantity ?? '—') +
       '</strong></div><div><span>Remaining</span><strong>' + (item.remaining_quantity ?? '—') + '</strong></div>' +
       '<span class="badge ' + (item.daily_status==='Active'?'active':item.daily_status==='Sold Out'?'sold':
         item.daily_status==='Scheduled for Today'?'low':'neutral') + '">' + escapeHtml(item.daily_status) + '</span></div>' +
-      '<div class="item-pricing-state"><span class="badge '+(itemPricingStatus(item)==='Model active'?'active':'neutral')+'">'+escapeHtml(itemPricingStatus(item))+'</span>'+
+      '<div class="manage-pricing"><div class="item-pricing-state"><span class="badge '+(itemPricingStatus(item)==='Model active'?'active':'neutral')+'">'+escapeHtml(itemPricingStatus(item))+'</span>'+
       '<span>'+escapeHtml(pricingLabel(item.pricing_source))+'</span></div>'+
-      '<p class="pricing-item-note">Minimum '+money(item.minimum_price??item.rescue_price)+'</p>' +
-      '<button class="upload-history-btn" data-click="uploadItemHistory" data-arg0="'+item.id+'">Upload Sales History</button>' +
-      '<button class="pricing-history-btn" data-click="openItemPricing" data-arg0="'+item.id+'">Pricing &amp; item history</button>' +
+      '<p class="pricing-item-note">Minimum '+money(item.minimum_price??item.rescue_price)+
+      (item.pricing_reason?'<br>'+escapeHtml(item.pricing_reason):'')+'</p>' +
+      '<div class="manage-pricing-actions"><button class="upload-history-btn" data-click="uploadItemHistory" data-arg0="'+item.id+'">Upload Sales History</button>' +
+      '<button class="pricing-history-btn" data-click="openItemPricing" data-arg0="'+item.id+'">Pricing &amp; item history</button></div></div>' +
       '<div class="manage-item-actions"><label for="daily-qty-' + item.id + '">Today\'s total quantity</label>' +
       '<input id="daily-qty-' + item.id + '" type="number" inputmode="numeric" min="0" step="1" value="' +
       (item.initial_quantity ?? '') + '" placeholder="Portions">' +
