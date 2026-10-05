@@ -12,6 +12,7 @@ const { registerAccountSecurity } = require('./account-security');
 const { registerCustomerExperience } = require('./customer-experience');
 const { registerTrainingData } = require('./training-data');
 const { registerPricing,refreshPrices,withPricingReadiness } = require('./pricing');
+const { registerRecommendations } = require('./recommendations');
 require('dotenv').config();
 
 const app = express();
@@ -45,7 +46,7 @@ const listingSql = `WITH clock AS (SELECT CURRENT_TIMESTAMP AT TIME ZONE 'Asia/D
     b.business_name,b.address AS pickup_address,b.city,b.city_id,
     ratings.average_rating,COALESCE(ratings.review_count,0) AS review_count,
     a.id AS daily_availability_id,a.offer_date::text AS offer_date,
-    a.initial_quantity,a.remaining_quantity,a.remaining_quantity AS quantity,
+    a.initial_quantity,a.remaining_quantity,a.remaining_quantity AS quantity,a.last_price,a.last_priced_at,
     CASE WHEN a.id IS NULL AND previous_a.id IS NOT NULL AND
       l.offer_end_time<l.offer_start_time AND
       clock.local_now::time>=l.offer_end_time AND clock.local_now::time<l.offer_start_time
@@ -144,6 +145,7 @@ registerAccountSecurity(app,{auth,wrap});
 registerCustomerExperience(app,{auth,role,wrap,validId,listingSql,restaurantSql,viewerCitySql});
 registerTrainingData(app,{auth,role,wrap});
 registerPricing(app,{auth,role,wrap,validId});
+registerRecommendations(app,{auth,role,wrap,listingSql,viewerCitySql});
 function publicOrder(order,user) {
   const { pickup_code,pickup_attempts,pickup_locked_until,...safe } = order;
   if (user.role==='customer' && user.userId===order.customer_id && ['pending','confirmed','ready'].includes(order.status))
@@ -338,11 +340,10 @@ async function listingInput(body) {
   const original = Number(body.original_price), rescue = Number(minimum);
   const start = clean(body.offer_start_time,5), end = clean(body.offer_end_time,5);
   if (!title || !category || body.original_price==='' || minimum==='' || minimum==null ||
-    !Number.isFinite(original) || original<0 || original>99999999.99 ||
-    !Number.isFinite(rescue) || rescue<0 || Math.round(rescue*100)>Math.floor(Math.round(original*100)*.8) ||
-    Math.abs(original*100-Math.round(original*100))>1e-6 || Math.abs(rescue*100-Math.round(rescue*100))>1e-6 ||
+    !Number.isSafeInteger(original) || original<0 || original>99999999 ||
+    !Number.isSafeInteger(rescue) || rescue<0 || rescue>Math.floor(original*.8) ||
     !/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end))
-    return { error:'Enter a title, category, valid offer times, and prices with at most two decimals. Minimum price must be at most 80% of original price.' };
+    return { error:'Enter a title, category, valid offer times, and whole-taka prices. Minimum price must be at most 80% of original price.' };
   const saved=await pool.query('SELECT name FROM food_categories WHERE LOWER(name)=LOWER($1)',[category]);
   if (!saved.rows.length) return { error:'Choose a saved category, or use Add Category first.' };
   return { values:[title,saved.rows[0].name,clean(body.description,2000)||null,original,rescue,start,end] };
@@ -356,8 +357,8 @@ app.post('/api/listings', auth, role('business'), imageUpload.single('image'), w
     imagePath=await saveImage(req.file);
     const created = await pool.query(`INSERT INTO listings
       (business_id,business_name,title,category,description,original_price,rescue_price,
-       offer_start_time,offer_end_time,image_path,quantity,status,is_active,minimum_price)
-      SELECT b.user_id,b.business_name,$2,$3,$4,$5,$6,$7,$8,$9,0,'sold_out',TRUE,$6
+       offer_start_time,offer_end_time,image_path,quantity,status,is_active,minimum_price,pricing_source)
+      SELECT b.user_id,b.business_name,$2,$3,$4,$5,FLOOR($5::numeric*0.8),$7,$8,$9,0,'sold_out',TRUE,$6,'time_policy'
       FROM businesses b WHERE b.user_id=$1 RETURNING id`,
       [req.user.userId,...parsed.values,imagePath]);
     imageCommitted=true;
@@ -376,7 +377,7 @@ app.put('/api/listings/:id', auth, role('business'), imageUpload.single('image')
   try {
     imagePath=await saveImage(req.file);
     const updated = await pool.query(`WITH changed AS (UPDATE listings SET title=$1,category=$2,description=$3,
-      original_price=$4,rescue_price=$5,minimum_price=$5,pricing_source='fallback',pricing_updated_at=NULL,
+      original_price=$4,rescue_price=LEAST(FLOOR($4::numeric*0.8),GREATEST($5::numeric,FLOOR(rescue_price))),minimum_price=$5,pricing_source='time_policy',pricing_updated_at=NULL,
       pricing_reason='Item settings changed. Review history and retrain.',offer_start_time=$6,offer_end_time=$7,
       image_path=COALESCE($8,image_path),updated_at=NOW()
       WHERE id=$9 AND business_id=$10 AND is_active=TRUE RETURNING id),

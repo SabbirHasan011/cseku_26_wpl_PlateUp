@@ -37,7 +37,7 @@ test('item pricing UI uses the minimum, links CSV to the item, selects explicit 
   await context.submitNewListing();assert.match(dom.document.getElementById('listing-feedback').textContent,/80%/);
   await context.openItemPricing(12);
   assert.match(dom.document.getElementById('pricing-metrics').innerHTML,/Synthetic demonstration/);
-  assert.match(dom.document.getElementById('pricing-summary').innerHTML,/160\.00/);
+  assert.match(dom.document.getElementById('pricing-summary').innerHTML,/160(?![\d.])/);
   assert.match(context.foodCard(item),/Demo model price/);
   dom.document.getElementById('pricing-file').files=[{size:80,text:async()=> 'CSV'}];
   await context.importItemHistory();

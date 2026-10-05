@@ -7,7 +7,23 @@ export const el = id => document.getElementById(id);
 export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[char]);
 
-export const money = amount => '৳' + Number(amount || 0).toFixed(2);
+// Preserve historical fractional order amounts; whole prices need no .00 suffix.
+export const money = amount => {
+  const value=Number(amount || 0);
+  return '৳' + (Number.isInteger(value)?String(value):value.toFixed(2));
+};
+
+export function discountPercent(item) {
+  const original=Number(item.original_price),effective=Number(item.rescue_price);
+  if(!Number.isFinite(original)||original<=0||!Number.isFinite(effective)||effective<0||effective>original)return null;
+  // Round the label down; the authoritative effective price stays unchanged.
+  return Math.floor((1-effective/original)*100+1e-9);
+}
+
+export function discountBadge(item) {
+  const percent=discountPercent(item);
+  return percent===null?'':'<span class="save-pill" aria-label="'+percent+'% discount">-'+percent+'%</span>';
+}
 
 export const date = value => value ? new Date(value).toLocaleString() : 'Any time';
 

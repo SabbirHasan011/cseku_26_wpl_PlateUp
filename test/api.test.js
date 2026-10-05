@@ -215,7 +215,7 @@ test('relational marketplace flow and ownership rules', async () => {
     assert.equal((await call('/cart/quote','POST',{ items:[] },customer)).status,400);
     assert.equal((await call('/cart/quote','POST',{ listing_id:listingId,quantity:1 })).status,401);
     const quote=await call('/cart/quote','POST',{ listing_id:listingId,quantity:2 },customer);
-    assert.equal(quote.body.valid,true); assert.equal(quote.body.total_price,100);
+    assert.equal(quote.body.valid,true); assert.equal(quote.body.total_price,160);
     assert.equal((await call('/cart/quote','POST',{ listing_id:listingId,quantity:3 },customer)).body.valid,false);
     assert.equal((await call('/cart/quote','POST',{ listing_id:distantId,quantity:1 },customer)).body.valid,false);
     await pool.query('UPDATE listings SET rescue_price=60 WHERE id=$1',[listingId]);

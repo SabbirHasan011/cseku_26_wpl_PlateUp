@@ -7,6 +7,7 @@ import { renderMyOrders } from './orders.js';
 import { persistCart } from './cart.js';
 import { renderListings, fetchListings, loadInitialData } from './marketplace.js';
 import { loadAccount } from './auth.js';
+import { resetRecommendations } from './recommendations.js';
 
 export const profileCity = () => state.currentUser?.role === 'business' ? state.profile?.business_city : state.profile?.customer_city;
 
@@ -91,6 +92,7 @@ export async function saveProfile(event) {
       preferred_location:el('profile-edit-location').value
     }) });
     if (cityChanged) {
+      resetRecommendations();
       state.cartItems = []; state.cartQuote=null; state.cartQuoteRequest++; state.listings = []; state.latestListingsRequest++;
       persistCart();
       closeModal('listing-detail-modal'); closeModal('checkout-modal'); renderListings();

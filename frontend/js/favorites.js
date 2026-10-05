@@ -5,6 +5,7 @@ import { renderListings, foodCard } from './marketplace.js';
 import { el, escapeHtml } from './ui.js';
 import { showScreen } from './router.js';
 import { renderRestaurantMenu } from './restaurants.js';
+import { loadRecommendations } from './recommendations.js';
 
 export function favoriteButton(kind,id) {
   if(state.currentUser?.role!=='customer') return '';
@@ -21,6 +22,7 @@ export async function loadFavorites() {
     if(request!==state.favoriteRequest||session!==state.token)return;
     state.favorites=data; renderFavorites(); renderListings();
     if(state.activeScreen==='restaurant') updateRestaurantFavorite();
+    await loadRecommendations();
   } catch(error) { if(request===state.favoriteRequest&&session===state.token&&el('favorites-status')) el('favorites-status').textContent=error.message; }
 }
 

@@ -6,6 +6,7 @@
     <div class="pricing-dialog-body">
       <div id="pricing-summary" class="pricing-summary"></div>
       <p id="pricing-state" class="pricing-state"></p>
+      <p class="pricing-customer-note">Daily offers open at 20% off. Prices are reviewed every 3 minutes and gradually decrease toward your minimum. Strong reservations or low stock hold the price. Each reduction is limited to 5% of the original price; ML adjustments are limited to 10% of the opening-to-minimum difference. Prices never rise within an offer unless you explicitly change the price boundaries.</p>
       <section class="pricing-section"><h4>1. Add this item's sales history</h4>
         <p>Upload one item per CSV, using the existing daily-offer template. New dates are added without replacing historical records. At least 30 eligible dates and three distinct price ratios are needed.</p>
         <p id="pricing-counts"></p>
@@ -15,7 +16,7 @@
       </section>
       <section class="pricing-section"><h4>2. Train the item model</h4>
         <label for="pricing-source">Training source</label><select id="pricing-source"><option value="restaurant">Imported restaurant history</option><option value="platform">Eligible PlateUp offers</option><option value="synthetic">Synthetic demo history</option></select>
-        <p>Sources are kept separate. Training checks the latest dates against a baseline; unsuitable models leave fallback pricing active. Retrain after adding new history or editing the item.</p>
+        <p>Sources are kept separate. Training checks the latest dates against a baseline; unsuitable models leave time-based pricing active. Retrain after adding new history or editing the item.</p>
         <button class="btn-pri" type="button" data-pricing-action data-click="trainItemModel">Train / retrain</button>
         <div id="pricing-metrics" class="pricing-metrics"></div>
       </section>
@@ -54,7 +55,7 @@
           <div class="form-group rescue-price-field"><label for="m-rescue-price">Minimum price (৳)</label><input type="number" id="m-rescue-price" placeholder="150" min="0" step="1" required></div>
         </div>
       </section>
-      <p class="pricing-editor-note">Customers receive at least 20% off. Set a minimum no higher than 80% of the original price. We use your minimum until you train a suitable item model. Add sales history from Manage Listings after saving.</p>
+      <p class="pricing-editor-note">Use whole-taka prices. New daily offers start at 20% off and gradually decrease toward your minimum, even without a trained model. Set a minimum no higher than 80% of the original price. Add sales history from Manage Listings for bounded ML assistance.</p>
       <section class="food-editor-section offer-editor">
         <h4><span>03</span> Daily offer window <small>Bangladesh time</small></h4>
         <div class="form-row">

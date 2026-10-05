@@ -2,8 +2,9 @@ const {spawn}=require('node:child_process');
 const path=require('node:path');
 const pool=require('./db');
 const {loadDataset}=require('./training-data');
-const {eligibility,generateSynthetic,writeCsv}=require('./training-format');
-const {decidePrice}=require('./pricing-policy');
+const {eligibility,writeCsv}=require('./training-format');
+const {PROFILES,generateItemHistory}=require('./synthetic-sales');
+const {decidePrice,offerWindow,REFRESH_MS}=require('./pricing-policy');
 
 function trainPython(rows) {
   return new Promise((resolve,reject)=>{
@@ -29,7 +30,7 @@ function trainPython(rows) {
 }
 
 // Runs on reads/checkout, not a scheduler. A DB timestamp bounds updates to once
-// per minute. Locks use the same listing -> inventory order as checkout/quantity.
+// every three minutes. Locks use the same listing -> inventory order as checkout/quantity.
 async function refreshPrices() {
   const db=await pool.connect();
   try {
@@ -37,27 +38,46 @@ async function refreshPrices() {
     const locked=await db.query('SELECT pg_try_advisory_xact_lock(73621944) AS locked');
     if(!locked.rows[0].locked){await db.query('ROLLBACK');return;}
     const rows=(await db.query(`SELECT l.*,m.artifact,m.source AS model_source,
-      a.id AS daily_id,a.offer_date::text,a.initial_quantity,a.remaining_quantity
+      a.id AS daily_id,a.offer_date::text,a.initial_quantity,a.remaining_quantity,a.last_price,a.last_priced_at
       FROM listings l LEFT JOIN pricing_models m ON m.listing_id=l.id
       LEFT JOIN daily_availability a ON a.listing_id=l.id AND a.offer_date=CASE
         WHEN l.offer_end_time<l.offer_start_time AND (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::time<l.offer_end_time
         THEN (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date-1 ELSE (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')::date END
       WHERE l.is_active AND l.minimum_price IS NOT NULL
-        AND (l.pricing_updated_at IS NULL OR l.pricing_updated_at<NOW()-INTERVAL '1 minute')
+        AND (l.pricing_updated_at IS NULL OR l.pricing_updated_at<=NOW()-INTERVAL '3 minutes'
+          OR l.rescue_price<>TRUNC(l.rescue_price) OR a.last_price<>TRUNC(a.last_price)
+          OR (plateup_daily_status(a.offer_date,a.remaining_quantity,l.offer_start_time,l.offer_end_time,
+            CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka')='Active'
+            AND (a.last_price IS NULL OR a.last_priced_at IS NULL OR a.last_priced_at<=NOW()-INTERVAL '3 minutes')))
       ORDER BY l.id FOR UPDATE OF l`)).rows;
     for(const item of rows) {
       if(item.daily_id) {
-        const stock=(await db.query('SELECT initial_quantity,remaining_quantity FROM daily_availability WHERE id=$1 FOR UPDATE',[item.daily_id])).rows[0];
+        const stock=(await db.query('SELECT initial_quantity,remaining_quantity,last_price,last_priced_at FROM daily_availability WHERE id=$1 FOR UPDATE',[item.daily_id])).rows[0];
         Object.assign(item,stock);
       }
       const artifact=item.artifact?.item_updated_at===new Date(item.updated_at).toISOString()?item.artifact:null;
-      const decision=decidePrice(item,artifact);
+      const now=new Date(),window=offerWindow(item);
+      let decision;
+      try {decision=decidePrice(item,artifact,now);}
+      catch(error) {
+        if(!(error instanceof RangeError))throw error;
+        // An incompatible legacy boundary must not block every other item.
+        await db.query('UPDATE listings SET pricing_reason=$2,pricing_updated_at=NOW() WHERE id=$1',[item.id,error.message]);
+        continue;
+      }
+      // Keep the per-day clock through quantity edits and retraining.
+      if(window && now>=window.start && now<window.end && Number(item.remaining_quantity)>0 &&
+        (item.last_price==null || !item.last_priced_at || now-new Date(item.last_priced_at)>=REFRESH_MS))
+        await db.query('UPDATE daily_availability SET last_price=$2,last_priced_at=$3 WHERE id=$1',[item.daily_id,decision.price,now]);
+      else if(item.last_price!=null && !Number.isInteger(Number(item.last_price)))
+        await db.query('UPDATE daily_availability SET last_price=$2 WHERE id=$1',[item.daily_id,decision.price]);
       await db.query(`UPDATE listings SET rescue_price=$2,pricing_source=$3,pricing_reason=$4,pricing_updated_at=NOW() WHERE id=$1`,
         [item.id,decision.price,decision.source,decision.reason]);
-      if(decision.source!=='fallback' && (Number(item.rescue_price)!==decision.price || item.pricing_source!==decision.source))
+      if(['model','synthetic_model'].includes(decision.source) && (Number(item.rescue_price)!==decision.price || item.pricing_source!==decision.source))
         await db.query(`INSERT INTO ml_predictions(business_id,listing_id,prediction_type,predicted_value,prediction_date,model_source,details)
           VALUES ($1,$2,'price',$3,NOW(),$4,$5)`,[item.business_id,item.id,decision.price,decision.source,
-          JSON.stringify({expected_remaining_collections:decision.expected,reason:decision.reason,model_trained_through:item.artifact.last_date})]);
+          JSON.stringify({expected_remaining_collections:decision.expected,baseline_price:decision.baseline_price,
+            policy_version:decision.policy_version,reason:decision.reason,model_trained_through:item.artifact.last_date})]);
     }
     await db.query('COMMIT');
   }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
@@ -85,7 +105,7 @@ async function withPricingReadiness(user,items) {
   const modelIds=new Set(models.rows.map(model=>model.listing_id));
   return items.map(item=>({...item,pricing_readiness:
     ['model','synthetic_model'].includes(item.pricing_source)?'Model active':
-    modelIds.has(item.id)?'Fallback active':
+    modelIds.has(item.id)?'Baseline active':
     [grouped.get(item.id+':real')||[],grouped.get(item.id+':synthetic')||[],
       native.rows.filter(row=>row.item_reference==='plateup:'+item.id)].some(historyReady)?'Ready to train':'History needed'}));
 }
@@ -137,13 +157,10 @@ function registerPricing(app,{auth,role,wrap,validId}) {
   app.post('/api/business/listings/:id/sample',...guard,wrap(async(req,res)=>{
     const item=await owned(req);
     if(Number(item.original_price)<=0)return res.status(400).json({message:'Sample data requires a positive original price.'});
-    const rows=generateSynthetic({seed:42,days:180,items:1,start:'2025-01-01'}).map(r=>{
-      const ratio=Number(r.rescue_unit_price)/Number(r.original_unit_price);
-      const price=Math.round(Number(item.original_price)*ratio*100)/100;
-      return {...r,item_reference:'sample-item-'+item.id,title:item.title,category:item.category,
-        original_unit_price:Number(item.original_price),rescue_unit_price:price,
-        revenue:Math.round(price*Number(r.collected_quantity)*100)/100};
-    });
+    const profile=PROFILES.find(p=>p.category===item.category)||PROFILES[0];
+    const rows=generateItemHistory({...profile,slug:'demo-item-'+item.id,title:item.title,category:item.category,
+      original_price:Number(item.original_price),minimum_price:Number(item.minimum_price),
+      start:item.offer_start_time.slice(0,5),end:item.offer_end_time.slice(0,5)});
     res.json({csv:writeCsv(rows),count:rows.length,message:'Synthetic demonstration only; import and train explicitly.'});
   }));
 }

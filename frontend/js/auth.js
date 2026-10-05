@@ -9,6 +9,7 @@ import { refreshNotifications } from './notifications.js';
 import { el, closeModal } from './ui.js';
 import { renderListings } from './marketplace.js';
 import { notify } from './feedback.js';
+import { resetRecommendations } from './recommendations.js';
 
 export async function openBusinessSignup() {
   if(!await showScreen('login'))return;
@@ -116,6 +117,7 @@ export function handleLogout() {
   state.favorites={saved:[],restaurants:[],listings:[]};
   closeModal('password-change-modal'); closeModal('reject-order-modal');
   state.token = null; state.currentUser = null; state.profile = null; state.orders = []; state.businessOrders = [];
+  resetRecommendations();
   state.businessListings = []; state.cartItems = [];
   state.restaurants=[]; state.selectedRestaurantId=null; state.selectedRestaurant=null; state.restaurantListings=[];
   state.latestRestaurantsRequest++; state.latestRestaurantRequest++;

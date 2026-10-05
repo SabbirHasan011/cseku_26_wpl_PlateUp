@@ -1,11 +1,11 @@
 import { state } from './state.js';
 import { requestJson } from './api.js';
-import { el,escapeHtml,money } from './ui.js';
+import { el,escapeHtml,money,pickupDate } from './ui.js';
 import { loadBusiness } from './business.js';
 
 let itemId=null,version=0,busy=false;
 export function pricingLabel(source) {
-  return source==='model'?'Model pricing':source==='synthetic_model'?'Demo model pricing':'Fallback price';
+  return source==='model'?'ML-assisted gradual pricing':source==='synthetic_model'?'Demo ML-assisted pricing':'Time-based pricing';
 }
 export async function openItemPricing(id,focusUpload=false) {
   itemId=id;version++;
@@ -30,8 +30,9 @@ async function refreshItemPricing() {
     el('pricing-title').textContent=item.title+' · Pricing & history';
     el('pricing-summary').innerHTML='<div><span>Current price</span><strong>'+money(item.rescue_price)+'</strong></div>'+ 
       '<div><span>Your minimum</span><strong>'+money(item.minimum_price)+'</strong></div>'+ 
-      '<div><span>20% discount ceiling</span><strong>'+money(Math.floor(Number(item.original_price)*80)/100)+'</strong></div>';
+      '<div><span>Opening price (20% off)</span><strong>'+money(Math.floor(Number(item.original_price)*.8))+'</strong></div>';
     el('pricing-state').textContent=pricingLabel(item.pricing_source)+'. '+(item.pricing_reason||'Add item history, then train a model.');
+    if(item.pricing_updated_at)el('pricing-state').textContent+=' Last checked '+pickupDate(item.pricing_updated_at)+'.';
     el('pricing-counts').textContent=data.platform_count+' eligible PlateUp offers · '+
       (data.imported.find(r=>r.data_source==='real')?.records||0)+' imported restaurant offers · '+
       (data.imported.find(r=>r.data_source==='synthetic')?.records||0)+' synthetic offers';
@@ -40,9 +41,12 @@ async function refreshItemPricing() {
       '<p>Latest-date test: '+m.test_rows+' offers. Mean absolute error: '+Number(m.mae_portions).toFixed(2)+
       ' portions; baseline: '+Number(m.baseline_mae_portions).toFixed(2)+' portions.</p><p>'+escapeHtml(m.reason)+'</p>'+ 
       (model.source==='synthetic'?'<p>Demo results do not measure real restaurant performance.</p>':''):
-      '<p>No model trained for this item. The minimum price is used until a suitable model is available.</p>';
+      '<p>No model trained for this item. Gradual time-based pricing still works. A usable model can make small adjustments to the schedule.</p>';
     el('pricing-feedback').textContent='';
   }catch(error){if(request===version&&session===state.token)el('pricing-feedback').textContent=error.message;}
+}
+export function refreshOpenItemPricing() {
+  if(!busy&&itemId&&el('item-pricing-modal')?.classList.contains('active'))return refreshItemPricing();
 }
 async function pricingAction(work) {
   if(busy)return;

@@ -72,13 +72,13 @@ test('favorites, rejection/expiry, daily reports, and secure password recovery',
     const route='/business/analytics/daily?from='+inventory.offer_date+'&to='+inventory.offer_date;
     const report=await call(route,'GET',null,business.token);
     assert.equal(report.status,200);
-    assert.deepEqual(report.body.days[0],{date:inventory.offer_date,offered:10,reserved:0,collected:1,remaining:9,missed:3,revenue:'100.00'});
+    assert.deepEqual(report.body.days[0],{date:inventory.offer_date,offered:10,reserved:0,collected:1,remaining:9,missed:3,revenue:'160.00'});
     assert.equal((await call(route,'GET',null,customer.token)).status,403);
     assert.equal((await call(route,'GET',null,otherBusiness.token)).body.days.length,0);
     assert.equal((await call('/business/analytics/daily?from=2026-02-30&to=2026-03-01','GET',null,business.token)).status,400);
     const csv=await call(route+'&format=csv','GET',null,business.token);
     assert.equal(csv.status,200);assert.match(csv.body,/date,offered,reserved,collected,remaining,missed,revenue/);
-    assert.ok(csv.body.includes(inventory.offer_date+',10,0,1,9,3,100.00'));
+    assert.ok(csv.body.includes(inventory.offer_date+',10,0,1,9,3,160.00'));
     await call('/listings/'+id,'DELETE',{},business.token);
     assert.equal((await call('/favorites','GET',null,customer.token)).body.listings.length,0);
     await call('/favorites/listing/'+id,'DELETE',{},customer.token);

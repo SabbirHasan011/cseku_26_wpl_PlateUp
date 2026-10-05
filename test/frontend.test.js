@@ -86,7 +86,7 @@ test('adding selected portions keeps checkout closed until the customer opens th
   assert.match(ui.node('detail-body').innerHTML,/Ends the next day/);
   ui.context.stepDetailQuantity(1); ui.context.stepDetailQuantity(1);
   assert.equal(ui.node('detail-quantity').value,'3');
-  assert.match(ui.node('detail-total').textContent,/450\.00/);
+  assert.match(ui.node('detail-total').textContent,/450(?![\d.])/);
   ui.context.reserveDetail({ preventDefault() {} });
   assert.equal(ui.run('cartItems.length'),3);
   assert.equal(ui.node('listing-detail-modal').classList.contains('active'),false);
@@ -103,8 +103,8 @@ test('adding selected portions keeps checkout closed until the customer opens th
   assert.equal(ui.node('cart-toast').hidden,true);
   assert.match(ui.node('checkout-summary').innerHTML,/Chicken biryani/);
   assert.match(ui.node('checkout-summary').innerHTML,/Test Kitchen/);
-  assert.match(ui.node('cart-grand-total').textContent,/450\.00/);
-  assert.match(ui.node('checkout-summary').innerHTML,/450\.00/);
+  assert.match(ui.node('cart-grand-total').textContent,/450(?![\d.])/);
+  assert.match(ui.node('checkout-summary').innerHTML,/450(?![\d.])/);
   ui.events.get('keydown')({ key:'Escape',preventDefault() {} });
   assert.equal(ui.node('checkout-modal').classList.contains('active'),false);
   assert.equal(ui.document.body.classList.contains('cart-is-open'),false);
@@ -260,18 +260,18 @@ test('cart quantities, current prices, removal and clearing stay connected to ch
   ui.context.addToCart(17,2);
   await ui.context.refreshCartQuote();
   assert.equal(ui.node('cart-confirm').disabled,false);
-  assert.match(ui.node('checkout-summary').innerHTML,/300\.00/);
+  assert.match(ui.node('checkout-summary').innerHTML,/300(?![\d.])/);
   ui.context.stepCartQuantity(17,1);
   await ui.context.refreshCartQuote();
   assert.equal(ui.run('cartItems.length'),3);
-  assert.match(ui.node('cart-grand-total').textContent,/450\.00/);
+  assert.match(ui.node('cart-grand-total').textContent,/450(?![\d.])/);
   ui.context.stepCartQuantity(17,-1);
   await ui.context.refreshCartQuote();
   assert.equal(ui.run('cartItems.length'),2);
   ui.context.changeCartQuantity(17,4);
   await ui.context.refreshCartQuote();
   assert.equal(ui.run('cartItems.length'),4);
-  assert.match(ui.node('checkout-summary').innerHTML,/600\.00/);
+  assert.match(ui.node('checkout-summary').innerHTML,/600(?![\d.])/);
   ui.context.changeCartQuantity(17,6);
   await ui.context.refreshCartQuote();
   assert.equal(ui.node('cart-confirm').disabled,true);
@@ -279,7 +279,7 @@ test('cart quantities, current prices, removal and clearing stay connected to ch
   ui.item.rescue_price=175;
   await ui.context.refreshCartQuote();
   assert.match(ui.node('cart-feedback').textContent,/Prices have changed/);
-  assert.match(ui.node('checkout-summary').innerHTML,/350\.00/);
+  assert.match(ui.node('checkout-summary').innerHTML,/350(?![\d.])/);
   await ui.context.confirmOrder();
   const orderRequest=ui.calls.find(call=>call.url==='/api/orders' && call.options.method==='POST');
   assert.deepEqual(JSON.parse(orderRequest.options.body).items,[{ listing_id:17,quantity:2,unit_price:175 }]);
@@ -292,7 +292,7 @@ test('cart quantities, current prices, removal and clearing stay connected to ch
   assert.equal(ui.run('cartItems.length'),0);
   assert.match(ui.node('checkout-summary').innerHTML,/Your cart is empty/);
   assert.equal(ui.node('cart-pickup-note').hidden,true);
-  assert.match(ui.node('cart-grand-total').textContent,/0\.00/);
+  assert.match(ui.node('cart-grand-total').textContent,/0(?![\d.])/);
 });
 
 test('city selection resolves aliases and rejects values outside the shared catalog',async()=>{
