@@ -12,6 +12,7 @@ import { loadAccount, captureResetLink } from './auth.js';
 import { loadInitialData } from './marketplace.js';
 import { refreshOrderActivity } from './notifications.js';
 import { refreshOpenItemPricing } from './pricing.js';
+import { loadBilling } from './billing.js';
 
 export function refreshVisibleData() {
   if (document.visibilityState==='hidden' || !hasView(state.activeScreen)) return;
@@ -20,6 +21,7 @@ export function refreshVisibleData() {
   if (state.activeScreen==='restaurants') loadRestaurants();
   if (state.activeScreen==='restaurant') loadRestaurant();
   if (state.activeScreen==='favorites') loadFavorites();
+  if (state.activeScreen==='admin'||state.activeScreen==='business'&&state.activeBusinessTab==='billing')loadBilling();
 }
 
 let started = false;

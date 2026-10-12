@@ -18,6 +18,8 @@ async function main() {
     await client.query(fs.readFileSync(path.join(__dirname, 'migrations', '005-training-data.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(__dirname, 'migrations', '006-dynamic-pricing.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(__dirname, 'migrations', '007-gradual-pricing.sql'), 'utf8'));
+    await client.query(fs.readFileSync(path.join(__dirname, 'migrations', '008-platform-billing.sql'), 'utf8'));
+    await client.query(fs.readFileSync(path.join(__dirname, 'migrations', '009-ten-percent-commission.sql'), 'utf8'));
     const pending = await client.query("SELECT id FROM orders WHERE pickup_code IS NULL AND status IN ('pending','confirmed','ready') FOR UPDATE");
     for (const order of pending.rows) {
       await client.query('UPDATE orders SET pickup_code=$1 WHERE id=$2',

@@ -14,13 +14,14 @@
         <button type="button" class="navitem" data-biz-tab="orders" data-click="switchBizTab" data-arg0="orders">Orders</button>
         <button type="button" class="navitem" data-click="switchBizTab" data-arg0="analytics">Sales & Predictions</button>
         <button type="button" class="navitem" data-click="switchBizTab" data-arg0="training">Data preparation</button>
+        <button type="button" class="navitem" data-click="switchBizTab" data-arg0="billing">Billing &amp; invoices</button>
         <button type="button" class="navitem" data-click="switchBizTab" data-arg0="reviews">Customer Reviews</button>
         <button type="button" class="navitem" id="business-profile-nav" data-click="switchBizTab" data-arg0="profile">Business Profile</button>
         <button class="newlist-btn" data-click="openNewListingModal">+ Add Food Item</button>
       </div>
 
       <div class="business-content">
-        <div class="business-mobile-menu"><label for="business-mobile-tab">Business pages</label><select id="business-mobile-tab" data-change="selectBusinessPage"><option value="overview">Overview</option><option value="listings">Manage Listings</option><option value="orders">Orders</option><option value="analytics">Sales &amp; Predictions</option><option value="training">Sales history &amp; data</option><option value="reviews">Customer Reviews</option><option value="profile">Business Profile</option></select></div>
+        <div class="business-mobile-menu"><label for="business-mobile-tab">Business pages</label><select id="business-mobile-tab" data-change="selectBusinessPage"><option value="overview">Overview</option><option value="listings">Manage Listings</option><option value="orders">Orders</option><option value="analytics">Sales &amp; Predictions</option><option value="training">Sales history &amp; data</option><option value="billing">Billing &amp; invoices</option><option value="reviews">Customer Reviews</option><option value="profile">Business Profile</option></select></div>
         <div class="business-page-heading"><p class="profile-label">Your kitchen on PlateUp</p><h1 id="business-page-title">Overview</h1><p id="business-page-caption">Your daily offers at a glance.</p></div>
         <div id="business-feedback" class="form-success" role="status" hidden></div>
         <div id="biz-tab-overview">
@@ -109,6 +110,21 @@
               <p id="training-sample-feedback" role="status"></p>
             </section>
           </div>
+        </section>
+        <section id="biz-tab-billing" style="display:none">
+          <div class="panel billing-panel">
+            <h2>Billing &amp; invoices</h2><p>PlateUp charges 10% of the actual discounted total of completed orders, including previous sales. Customers pay you directly. Settle platform fees separately with the platform owner.</p>
+            <p class="billing-note">Minimum food prices remain customer-facing prices. Your amount after commission is the order total minus the service fee. Pending, cancelled, rejected and expired orders have no fee.</p><p id="business-billing-instructions"></p>
+            <div class="billing-toolbar"><div><label for="business-billing-month">Billing month</label><input id="business-billing-month" type="month"></div><button class="btn-pri" data-click="loadBilling">Refresh report</button><p>Leave empty for all periods.</p></div>
+            <p id="business-billing-status" role="status"></p><div id="business-billing-summary" class="billing-stats"></div>
+            <div class="billing-table-wrap"><table><thead><tr><th>Statement</th><th>Commission</th><th>Fees paid</th><th>Outstanding</th><th>Status</th><th>Details</th></tr></thead><tbody id="business-billing-invoices"></tbody></table></div>
+          </div>
+          <section id="business-invoice-detail" class="panel billing-panel" hidden>
+            <div class="billing-toolbar"><div><h2 id="business-invoice-heading"></h2><p id="business-invoice-period"></p></div><button class="btn-sec" data-click="downloadBillingInvoice">Download statement CSV</button></div>
+            <div id="business-invoice-summary" class="billing-stats"></div>
+            <div class="billing-table-wrap"><table><thead><tr><th>Order</th><th>Meal</th><th>Pickup completed (BST)</th><th>Order total</th><th>Rate</th><th>Commission</th></tr></thead><tbody id="business-invoice-lines"></tbody></table></div>
+            <h3>Payment receipts</h3><div id="business-invoice-payments"></div>
+          </section>
         </section>
         <section id="biz-tab-profile" class="panel" style="display:none">
           <h3>Business profile</h3>

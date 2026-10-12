@@ -1,0 +1,23 @@
+<div id="admin" class="screen">
+  <div class="business-page-heading"><p class="profile-label">PlateUp platform owner</p><h1>Platform revenue</h1><p>Track all completed food sales, 10% commission, payments recorded and outstanding restaurant fees.</p></div>
+  <section class="panel billing-panel">
+    <div class="billing-toolbar"><div><label for="admin-billing-month">Billing month</label><input id="admin-billing-month" type="month"></div><button class="btn-pri" data-click="loadBilling">Refresh report</button><p>Leave the month empty for all periods.</p></div>
+    <p id="admin-billing-status" role="status"></p><div id="admin-billing-summary" class="billing-stats"></div>
+    <p class="billing-note">Money received means a receipt manually verified and recorded by an administrator. This page does not process online payments. Demo receipts are separate and never settle real balances.</p>
+    <div class="billing-table-wrap"><table><thead><tr><th>Statement</th><th>Restaurant</th><th>Commission</th><th>Actual receipts</th><th>Outstanding</th><th>Status</th><th>Details</th></tr></thead><tbody id="admin-billing-invoices"></tbody></table></div>
+  </section>
+  <section id="admin-invoice-detail" class="panel billing-panel" hidden>
+    <div class="billing-toolbar"><div><h2 id="admin-invoice-heading"></h2><p id="admin-invoice-period"></p></div><button class="btn-sec" data-click="downloadBillingInvoice">Download statement CSV</button></div>
+    <div id="admin-invoice-summary" class="billing-stats"></div>
+    <div class="billing-table-wrap"><table><thead><tr><th>Order</th><th>Meal</th><th>Pickup completed (BST)</th><th>Order total</th><th>Rate</th><th>Commission</th></tr></thead><tbody id="admin-invoice-lines"></tbody></table></div>
+    <h3>Record a restaurant payment</h3><p>Partial payments are allowed. Choose Demo for a classroom simulation. Verify actual transfer or cash receipts first.</p>
+    <form id="billing-payment-form" data-submit="recordBillingPayment">
+      <div class="form-row"><div class="form-group"><label for="billing-payment-kind">Receipt type</label><select id="billing-payment-kind"><option value="demo">Demo · not actual income</option><option value="real">Verified actual receipt</option></select></div><div class="form-group"><label for="billing-payment-amount">Amount (৳)</label><input id="billing-payment-amount" type="number" min="0.01" step="0.01" required></div></div>
+      <div class="form-row"><div class="form-group"><label for="billing-payment-method">Payment method</label><select id="billing-payment-method"><option value="bank_transfer">Bank transfer</option><option value="bkash">bKash</option><option value="nagad">Nagad</option><option value="cash">Cash</option><option value="other">Other</option></select></div><div class="form-group"><label for="billing-payment-date">Date received (Bangladesh)</label><input id="billing-payment-date" type="date" required></div></div>
+      <div class="form-row"><div class="form-group"><label for="billing-payment-reference">Unique transaction / receipt reference</label><input id="billing-payment-reference" maxlength="120" required></div><div class="form-group"><label for="billing-payment-note">Note (optional)</label><input id="billing-payment-note" maxlength="500"></div></div>
+      <label class="billing-confirm"><input id="billing-payment-verified" type="checkbox"> I verified this actual payment against a bank/mobile transfer or cash receipt.</label>
+      <p id="billing-payment-feedback" class="detail-feedback" role="status"></p><button id="billing-payment-submit" class="btn-pri" type="submit">Record receipt</button>
+    </form>
+    <h3>Receipt history</h3><div id="admin-invoice-payments"></div>
+  </section>
+</div>

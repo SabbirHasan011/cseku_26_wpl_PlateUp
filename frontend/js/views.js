@@ -5,7 +5,7 @@ const files = Object.freeze({
   restaurants: 'views/restaurants.html', restaurant: 'views/restaurant.html',
   'my-orders': 'views/orders.html', favorites: 'views/favorites.html',
   recovery: 'views/recovery.html', 'reset-password': 'views/reset-password.html',
-  profile: 'views/profile.html', business: 'views/business.html'
+  profile: 'views/profile.html', business: 'views/business.html', admin: 'views/admin.html', 'admin-login':'views/admin-login.html'
 });
 const pending = new Map();
 const mounted = new Map();

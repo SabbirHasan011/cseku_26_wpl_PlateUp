@@ -16,7 +16,7 @@ test('Express serves the shell, every view/module and CSS while keeping server/c
     assert.equal(legacy.status,302);assert.equal(legacy.headers.get('location'),'/');
     for(const url of ['/login','/browse-food','/restaurants','/restaurants/12','/orders','/favorites',
       '/profile','/forgot-password','/reset-password','/business','/business/overview','/business/listings',
-      '/business/orders','/business/analytics','/business/reviews','/business/profile','/business/training/']) {
+      '/business/orders','/business/analytics','/business/reviews','/business/profile','/business/training/','/business/billing','/admin','/admin/login']) {
       const response=await fetch(base+url);
       assert.equal(response.status,200,url);
       assert.equal(await response.text(),shell,url+' must support a direct visit or refresh');

@@ -335,6 +335,8 @@ test('relational marketplace flow and ownership rules', async () => {
   } finally {
     await pool.query('DELETE FROM sales_data WHERE order_id IN (SELECT id FROM orders WHERE customer_id=$1)',[ids[0]]);
     await pool.query('DELETE FROM reviews WHERE customer_id=$1',[ids[0]]);
+    await pool.query('DELETE FROM platform_commissions WHERE order_id IN (SELECT id FROM orders WHERE customer_id=$1)',[ids[0]]);
+    await pool.query('DELETE FROM billing_invoices WHERE business_id=ANY($1)',[ids.slice(1)]);
     await pool.query('DELETE FROM orders WHERE customer_id=$1',[ids[0]]);
     await pool.query('DELETE FROM daily_availability WHERE listing_id=ANY($1)',[listingIds]);
     await pool.query('DELETE FROM listings WHERE business_id=ANY($1)',[ids.slice(1)]);

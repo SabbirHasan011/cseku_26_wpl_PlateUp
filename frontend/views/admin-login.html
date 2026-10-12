@@ -1,0 +1,24 @@
+<div id="admin-login" class="screen">
+  <div class="auth-container admin-auth-container">
+    <div class="admin-auth-mark" aria-hidden="true">P</div>
+    <div class="auth-header">
+      <p class="admin-auth-eyebrow">PlateUp administration</p>
+      <h2>Administrator sign in</h2>
+      <p>Access platform revenue and restaurant billing.</p>
+    </div>
+    <div id="admin-login-error" class="auth-error" role="alert" aria-live="polite"></div>
+    <form id="admin-login-form" class="auth-form active" data-submit="handleAdminLogin">
+      <div class="form-group">
+        <label for="admin-login-email">Administrator email</label>
+        <input type="email" id="admin-login-email" autocomplete="username" maxlength="255" placeholder="owner@example.com" required>
+      </div>
+      <div class="form-group">
+        <label for="admin-login-password">Password</label>
+        <input type="password" id="admin-login-password" autocomplete="current-password" required>
+      </div>
+      <button id="admin-login-submit" type="submit" class="btn-submit">Sign in to administration</button>
+    </form>
+    <p class="admin-auth-note">For authorized platform administrators only.</p>
+    <button type="button" class="password-recovery-link" data-click="showScreen" data-arg0="home">Return to PlateUp</button>
+  </div>
+</div>

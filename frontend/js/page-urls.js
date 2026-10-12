@@ -1,8 +1,8 @@
 // Application-owned URLs. Never turn a URL into an arbitrary partial/import path.
 export const screenPaths = Object.freeze({home:'/',login:'/login',customer:'/browse-food',
   restaurants:'/restaurants','my-orders':'/orders',favorites:'/favorites',profile:'/profile',
-  recovery:'/forgot-password','reset-password':'/reset-password',business:'/business'});
-export const businessTabs = Object.freeze(['overview','listings','orders','analytics','reviews','profile','training']);
+  recovery:'/forgot-password','reset-password':'/reset-password',business:'/business',admin:'/admin','admin-login':'/admin/login'});
+export const businessTabs = Object.freeze(['overview','listings','orders','analytics','reviews','profile','training','billing']);
 
 export function readPageUrl() {
   const path=(location.hash?.startsWith('#/')?location.hash.slice(1).split('?')[0]:location.pathname||'/').replace(/\/+$/,'')||'/';

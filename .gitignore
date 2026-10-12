@@ -15,3 +15,8 @@ coverage/
 dist/
 build/
 *.log
+
+# Portable demo build tools, intermediate output and local signing keys.
+mobile-demo/.toolchain/
+mobile-demo/.build/
+mobile-demo/.signing/

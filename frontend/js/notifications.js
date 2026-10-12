@@ -8,7 +8,7 @@ import { renderBusinessOrders, renderMyOrders } from './orders.js';
 import { renderProfile } from './profile.js';
 
 export async function refreshNotifications() {
-  if (!state.token || !state.currentUser) return;
+  if (!state.token || !state.currentUser || state.currentUser.role==='admin') return;
   const session=state.token;
   const data=await requestJson('/notifications');
   if (session!==state.token) return;
@@ -52,7 +52,7 @@ export async function openNotificationOrder(id) {
 }
 
 export async function refreshOrderActivity() {
-  if (document.visibilityState==='hidden' || !state.token || !state.currentUser || state.activityRefreshing) return;
+  if (document.visibilityState==='hidden' || !state.token || !state.currentUser || state.currentUser.role==='admin' || state.activityRefreshing) return;
   state.activityRefreshing=true;
   const session=state.token;
   try {
