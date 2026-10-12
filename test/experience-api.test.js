@@ -112,6 +112,8 @@ test('favorites, rejection/expiry, daily reports, and secure password recovery',
     app.locals.passwordResetSender=oldSender;
     const ids=users.map(user=>user.id);
     await pool.query('DELETE FROM sales_data WHERE business_id=ANY($1)',[ids]);
+    await pool.query('DELETE FROM platform_commissions WHERE order_id IN (SELECT id FROM orders WHERE customer_id=ANY($1))',[ids]);
+    await pool.query('DELETE FROM billing_invoices WHERE business_id=ANY($1)',[ids]);
     await pool.query('DELETE FROM orders WHERE customer_id=ANY($1)',[ids]);
     await pool.query('DELETE FROM daily_availability WHERE listing_id=ANY($1)',[listingIds]);
     await pool.query('DELETE FROM listings WHERE id=ANY($1)',[listingIds]);

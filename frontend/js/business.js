@@ -10,6 +10,7 @@ import { loadTrainingData } from './training.js';
 import { showScreen } from './router.js';
 import { businessTabs } from './page-urls.js';
 import { notify, skeletonCards } from './feedback.js';
+import { loadBilling } from './billing.js';
 
 export async function loadBusiness() {
   if (!state.currentUser || state.currentUser.role !== 'business') return;
@@ -84,16 +85,17 @@ export function activateBusinessTab(name) {
     item.classList.toggle('on',item.dataset.arg0===name);
     item.setAttribute('aria-current',item.dataset.arg0===name?'page':'false');
   });
-  ['overview','listings','orders','analytics','reviews','profile','training'].forEach(tab => {
+  businessTabs.forEach(tab => {
     el('biz-tab-' + tab).style.display = tab === name ? 'block' : 'none';
   });
   const headings={overview:['Today at your kitchen','Your daily offers and pickups, at a glance.'],listings:['Manage Listings','Save your menu once. Update today’s portions when they’re ready.'],orders:['Manage Orders','Confirm reservations and help customers collect their meals.'],analytics:['Sales & Analytics','Track the food rescued and revenue earned by your kitchen.'],training:['Sales History','Prepare and inspect your historical sales data.'],reviews:['Customer Reviews','See customer feedback and reply to their experience.'],profile:['Business Profile','Keep your kitchen’s location and contact details up to date.']};
   el('business-mobile-tab').value=name;
-  el('business-page-title').textContent=headings[name][0];
-  el('business-page-caption').textContent=headings[name][1];
+  el('business-page-title').textContent=name==='billing'?'Billing & invoices':headings[name][0];
+  el('business-page-caption').textContent=name==='billing'?'Monthly service fees and recorded receipts.':headings[name][1];
   if (name === 'profile') renderProfile();
   if (name === 'analytics') return loadDailyAnalytics();
   if (name === 'training') return loadTrainingData();
+  if (name === 'billing') return loadBilling();
 }
 
 export function analyticsQuery() {

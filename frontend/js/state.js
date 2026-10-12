@@ -1,6 +1,12 @@
 // Shared session and feature state; never attached to window.
 export const state = {
   token: localStorage.getItem('plateup_token'),
+  billingData: null,
+  billingInvoice: null,
+  billingContext: null,
+  billingRequest: 0,
+  billingDetailRequest: 0,
+  billingSaving: false,
   currentUser: null,
   profile: null,
   listings: [],

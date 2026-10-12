@@ -19,6 +19,7 @@ async function setup() {
         '/api/orders':[], '/api/restaurants':[], '/api/notifications':{notifications:[],unread_count:0},
         '/api/favorites':{saved:[],restaurants:[],listings:[]}, '/api/business/listings':[],
         '/api/recommendations':{mode:'local',listings:[]},
+        '/api/business/billing':{commission_rate_bps:1000,summary:{},invoices:[]},'/api/admin/revenue':{commission_rate_bps:1000,summary:{},invoices:[]},
         '/api/business/analytics':{summary:{active_listings:0,meals_rescued:0,revenue:0},sales:[]}, '/api/business/predictions':[] };
       if(!Object.hasOwn(responses,url))throw Error('Unexpected API '+url);
       return {ok:true,headers:{get:()=> 'application/json'},json:async()=>responses[url]};
@@ -358,5 +359,83 @@ test('recommendations handle errors, retries, empty results and stale city/accou
   await previousAccount;assert.equal(c.state.token,'second','A stale unauthorized response cannot sign out the new account');
   assert.equal(c.state.currentUser.id,2);assert.equal(c.state.recommendations.length,0);
   c.state.currentUser={id:3,role:'business'};c.renderRecommendations();assert.equal(n('home-recommendations').hidden,true);
+  assert.deepEqual(ui.errors,[]);
+});
+
+test('separate admin sign-in protects deep links and public signup has no admin option',async()=>{
+  const ui=await setup(),c=ui.context,n=id=>ui.document.getElementById(id),fetch=c.fetch;
+  await c.showScreen('login');
+  assert.equal(n('admin-role-option'),null);
+  c.selectRole('admin',ui.document.querySelector('.role-opt'));
+  assert.equal(c.state.selectedRole,'customer');
+  c.switchAuthMode('signup',ui.document.querySelector('.auth-tab'));
+  assert.equal(c.state.selectedRole,'customer');
+  assert.equal(c.resolveScreen('admin'),'admin-login');
+  await c.showScreen('admin');assert.equal(c.state.activeScreen,'admin-login');
+  assert.equal(c.pagePath('admin-login'),'/admin/login');
+  assert.equal(n('admin-login').querySelectorAll('.role-opt').length,0);
+  assert.equal(n('admin-login').querySelectorAll('[data-submit="handleSignup"]').length,0);
+  assert.doesNotMatch(n('nav-controls').innerHTML,/admin-login|data-arg0="admin"/);
+  c.fetch=async(url,options)=>{
+    if(url==='/api/auth/admin/login') {assert.equal(JSON.parse(options.body).role,undefined);return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({token:'admin-session',user:{role:'admin'}})};}
+    if(url==='/api/me')return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({profile:{id:5,name:'Admin',role:'admin',email:'admin@example.test'}})};
+    return fetch(url,options);
+  };
+  n('admin-login-email').value='admin@example.test';n('admin-login-password').value='Password123!';
+  await c.actions.handleAdminLogin({preventDefault(){}});
+  assert.equal(c.state.activeScreen,'admin');assert.equal(c.pagePath('admin'),'/admin');
+  assert.equal(c.resolveScreen('profile'),'admin');assert.equal(n('admin-billing-invoices').getAttribute('aria-busy'),'false');
+  assert.equal(ui.calls.some(url=>url==='/api/orders'||url==='/api/business/listings'),false);
+  assert.equal(n('admin-login-password').value,'');
+  assert.equal(c.resolveScreen('admin-login'),'admin');
+  c.handleLogout();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(c.state.activeScreen,'admin-login');
+  c.state.currentUser={id:2,name:'Business',role:'business'};c.state.token='business-session';c.state.profile={business_name:'Kitchen'};
+  assert.equal(c.resolveScreen('admin'),'business');assert.equal(c.resolveScreen('admin-login'),'business');
+  await c.showScreen('business',{tab:'billing'});assert.equal(n('biz-tab-billing').style.display,'block');
+  assert.equal(c.pagePath('business',{tab:'billing'}),'/business/billing');
+  c.handleLogout();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(n('admin-invoice-detail').hidden,true);assert.equal(c.state.billingInvoice,null);assert.equal(n('admin-billing-invoices').innerHTML,'');
+  assert.deepEqual(ui.errors,[]);
+});
+
+test('admin sign-in shows generic errors and restores submit control after failure',async()=>{
+  const ui=await setup(),c=ui.context,n=id=>ui.document.getElementById(id);
+  await c.showScreen('admin-login');
+  c.fetch=async()=>({ok:false,status:429,headers:{get:()=> 'application/json'},json:async()=>({message:'Too many sign-in attempts. Please try again later.'})});
+  n('admin-login-email').value='owner@example.test';n('admin-login-password').value='WrongPassword';
+  await c.handleAdminLogin({preventDefault(){}});
+  assert.equal(c.state.activeScreen,'admin-login');assert.equal(c.state.token,null);
+  assert.match(n('admin-login-error').textContent,/Too many sign-in attempts/);
+  assert.equal(n('admin-login-error').style.display,'block');assert.equal(n('admin-login-submit').disabled,false);
+  assert.deepEqual(ui.errors,[]);
+});
+
+test('billing screens distinguish money received and demos, retain receipt references, and ignore stale account responses',async()=>{
+  const ui=await setup(),c=ui.context,n=id=>ui.document.getElementById(id),fetch=c.fetch,requests=[];
+  c.state.currentUser={id:1,name:'Admin',role:'admin'};c.state.token='admin-token';
+  const invoice={id:9,business_id:2,business_name:'<Kitchen>',invoice_number:'PU-202610-9',period_start:'2026-10-01',period_open:true,
+    gross_sales:'200.00',commission_total:'20.00',real_received:'0.00',demo_received:'10.00',outstanding:'20.00',payment_status:'unpaid'};
+  const detail={invoice,entries:[{order_id:7,item_title:' =SUM(1,2)',completed_at:new Date().toISOString(),gross_amount:'200.00',rate_bps:1000,fee_amount:'20.00'}],
+    payments:[{id:1,amount:'10.00',kind:'demo',method:'cash',reference:'<demo receipt>',note:'Simulation',received_at:new Date().toISOString(),recorded_by_name:'Admin'}]};
+  c.fetch=async(url,options={})=>{
+    if(url==='/api/admin/revenue')return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({commission_rate_bps:1000,summary:invoice,invoices:[invoice]})};
+    if(url==='/api/admin/billing/invoices/9')return {ok:true,headers:{get:()=> 'application/json'},json:async()=>detail};
+    if(url==='/api/admin/billing/invoices/9/payments') {requests.push(JSON.parse(options.body));return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({payment:{id:2}})};}
+    return fetch(url,options);
+  };
+  await c.showScreen('admin');assert.match(n('admin-billing-summary').innerHTML,/Money received/);assert.match(n('admin-billing-summary').innerHTML,/Demo receipts/);
+  assert.match(n('admin-billing-summary').innerHTML,/Completed food sales/);assert.match(n('admin-billing-status').textContent,/10%.*previous sales/);
+  await c.actions.openBillingInvoice({}, {dataset:{arg0:'9'}});
+  assert.match(n('admin-invoice-payments').innerHTML,/DEMO · not income/);assert.match(n('admin-invoice-payments').innerHTML,/&lt;demo receipt&gt;/);
+  assert.match(n('admin-invoice-lines').innerHTML,/10%/);assert.match(n('admin-invoice-heading').textContent,/<Kitchen>/);
+  const csv=c.billingInvoiceCsv(detail);assert.match(csv,/' =SUM\(1,2\)/);assert.match(csv,/Demo receipts \(not income\)/);
+  n('billing-payment-kind').value='demo';n('billing-payment-amount').value='10.00';n('billing-payment-reference').value='DEMO-001';n('billing-payment-method').value='cash';
+  await c.actions.recordBillingPayment({preventDefault(){}});
+  assert.equal(requests[0].kind,'demo');assert.equal(requests[0].reference,'DEMO-001');assert.equal(n('billing-payment-submit').disabled,false);
+  let release;c.fetch=async(url,options)=>url==='/api/admin/revenue'?new Promise(resolve=>release=resolve):fetch(url,options);
+  const pending=c.loadBilling();c.state.token='another';c.state.currentUser={id:2,name:'Business',role:'business'};c.resetBilling();
+  release({ok:true,headers:{get:()=> 'application/json'},json:async()=>({summary:invoice,invoices:[invoice]})});await pending;
+  assert.equal(c.state.billingData,null);assert.equal(n('admin-billing-invoices').innerHTML,'');
   assert.deepEqual(ui.errors,[]);
 });

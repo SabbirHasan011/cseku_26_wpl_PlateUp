@@ -9,6 +9,30 @@
   .training-summary { background: var(--green-100); border-radius: 10px; padding: 12px; font-weight: 600; }
   #training-import-feedback { white-space: pre-line; overflow-wrap: anywhere; }
   .training-note { padding: 12px; background: var(--amber-100); border-radius: 10px; }
+  .billing-panel[hidden] { display: none; }
+  .billing-panel h2 { font-family: var(--font-display); color: var(--green-900); margin: 0 0 12px; }
+  .billing-panel > p { font-size: 13px; color: var(--ink-soft); line-height: 1.6; }
+  .billing-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+  .billing-toolbar label { display: block; font-size: 12px; margin-bottom: 6px; }
+  .billing-toolbar input { min-height: 44px; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px; font: inherit; }
+  .billing-toolbar p { font-size: 12px; color: var(--ink-soft); }
+  .billing-toolbar button { min-height: 44px; }
+  .billing-stats { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,160px),1fr)); gap: 12px; margin: 18px 0; }
+  .billing-stats .stat-value { font-size: 25px; overflow-wrap: anywhere; }
+  .billing-note { padding: 12px 14px; border-radius: 10px; background: var(--amber-100); }
+  .billing-table-wrap { overflow-x: auto; margin: 18px 0; }
+  .billing-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+  .billing-table-wrap th { color: var(--green-900); background: var(--green-50); }
+  .billing-table-wrap th,.billing-table-wrap td { padding: 12px; border-bottom: 1px solid var(--line); }
+  .billing-table-wrap small { display: block; margin-top: 6px; color: var(--ink-soft); }
+  .billing-table-wrap button { white-space: nowrap; min-height: 44px; }
+  .billing-receipt { display: flex; flex-wrap: wrap; gap: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px; overflow-wrap: anywhere; }
+  .billing-receipt > div { flex: 1; min-width: min(100%,200px); }
+  .billing-receipt p,.billing-receipt small { font-size: 12px; color: var(--ink-soft); line-height: 1.6; }
+  .billing-void-form { display: grid; gap: 6px; font-size: 12px; }
+  .billing-void-form input { min-width: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .billing-confirm { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.6; }
+  .billing-confirm input { flex-shrink: 0; width: 18px; height: 18px; margin-top: 2px; }
   :root {
     --ink: #16241C;
     --ink-soft: #3E4A3F;
@@ -259,6 +283,10 @@
 
   /* Login & Signup Authentication Container */
   .auth-container { max-width: 440px; margin: 40px auto; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 32px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); }
+  .admin-auth-container { border-top: 4px solid var(--green-900); }
+  .admin-auth-mark { width: 48px; height: 48px; margin: 0 auto 18px; display: grid; place-items: center; background: var(--green-900); color: white; border-radius: 14px; font-family: var(--font-display); font-size: 28px; }
+  .auth-header .admin-auth-eyebrow { margin-bottom: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 11px; }
+  .admin-auth-note { margin: 20px 0 0; color: var(--ink-soft); text-align: center; font-size: 12px; }
   
   .auth-tabs { display: flex; border-bottom: 2px solid var(--line); margin-bottom: 20px; }
   .auth-tab { flex: 1; text-align: center; padding: 10px; font-weight: 700; font-size: 15px; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }

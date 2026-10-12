@@ -10,6 +10,8 @@ import { el, closeModal } from './ui.js';
 import { renderListings } from './marketplace.js';
 import { notify } from './feedback.js';
 import { resetRecommendations } from './recommendations.js';
+import { resetBilling } from './billing.js';
+import { hasView } from './views.js';
 
 export async function openBusinessSignup() {
   if(!await showScreen('login'))return;
@@ -33,10 +35,10 @@ export async function loadAccount(throwOnFailure = false) {
       state.orders = await requestJson('/orders');
       renderProfile();
       await loadFavorites();
-    } else {
+    } else if (state.currentUser.role === 'business') {
       await loadBusiness();
     }
-    await refreshNotifications();
+    if(state.currentUser.role!=='admin')await refreshNotifications();
   } catch (error) {
     if (throwOnFailure) throw error;
     console.warn(error.message);
@@ -54,6 +56,7 @@ export function switchAuthMode(mode, tab) {
 }
 
 export function selectRole(role, element) {
+  if(!['customer','business'].includes(role))return;
   state.selectedRole = role;
   document.querySelectorAll('.role-opt').forEach(item => item.classList.remove('selected'));
   element.classList.add('selected');
@@ -111,13 +114,36 @@ export async function handleSignup(event) {
   } catch (error) { showAuthError(error.message); }
 }
 
+export async function handleAdminLogin(event) {
+  event.preventDefault();
+  const button=el('admin-login-submit'),errorBanner=el('admin-login-error');
+  if(button.disabled)return;
+  button.disabled=true;button.textContent='Signing in…';errorBanner.style.display='none';
+  try {
+    const data=await requestJson('/auth/admin/login',{method:'POST',body:JSON.stringify({
+      email:el('admin-login-email').value.trim(),password:el('admin-login-password').value
+    })});
+    if(data.user?.role!=='admin')throw new Error('Invalid credentials');
+    state.token=data.token;localStorage.setItem('plateup_token',state.token);
+    await loadAccount(true);
+    if(state.currentUser?.role!=='admin')throw new Error('Could not load your administrator account.');
+    el('admin-login-password').value='';
+    await navigateAfterLogin();
+  } catch(error) {
+    if(!state.currentUser) {state.token=null;localStorage.removeItem('plateup_token');}
+    errorBanner.textContent=error.message;errorBanner.style.display='block';
+  } finally {button.disabled=false;button.textContent='Sign in to administration';}
+}
+
 export function handleLogout() {
+  const wasAdmin=state.currentUser?.role==='admin';
   clearReturnRoute();
   persistCart(); state.restoredCartOwner=null; state.favoriteRequest++;
   state.favorites={saved:[],restaurants:[],listings:[]};
   closeModal('password-change-modal'); closeModal('reject-order-modal');
   state.token = null; state.currentUser = null; state.profile = null; state.orders = []; state.businessOrders = [];
   resetRecommendations();
+  resetBilling();
   state.businessListings = []; state.cartItems = [];
   state.restaurants=[]; state.selectedRestaurantId=null; state.selectedRestaurant=null; state.restaurantListings=[];
   state.latestRestaurantsRequest++; state.latestRestaurantRequest++;
@@ -130,7 +156,10 @@ export function handleLogout() {
   localStorage.removeItem('plateup_token');
   localStorage.removeItem('plateup_user');
   localStorage.removeItem('plateup_screen');
-  renderTopNav(); renderListings(); showScreen('home');
+  if(hasView('admin-login')) {
+    el('admin-login-form').reset();el('admin-login-error').style.display='none';
+  }
+  renderTopNav(); renderListings(); showScreen(wasAdmin?'admin-login':'home');
 }
 
 export function openPasswordChange() {
@@ -141,7 +170,7 @@ export async function changePassword(event) {
   event.preventDefault(); if(el('password-change-submit').disabled)return;
   if(el('password-new').value!==el('password-confirm').value){el('password-change-feedback').textContent='New passwords do not match.';return;}
   el('password-change-submit').disabled=true;
-  try{const result=await requestJson('/auth/change-password',{method:'POST',body:JSON.stringify({current_password:el('password-current').value,new_password:el('password-new').value})});closeModal('password-change-modal');el('password-change-form').reset();handleLogout();await showScreen('login');notify(result.message);}
+  try{const wasAdmin=state.currentUser?.role==='admin';const result=await requestJson('/auth/change-password',{method:'POST',body:JSON.stringify({current_password:el('password-current').value,new_password:el('password-new').value})});closeModal('password-change-modal');el('password-change-form').reset();handleLogout();await showScreen(wasAdmin?'admin-login':'login');notify(result.message);}
   catch(error){el('password-change-feedback').textContent=error.message;}
   finally{el('password-change-submit').disabled=false;}
 }

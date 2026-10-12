@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { loadBilling,openBillingInvoice,recordBillingPayment,voidBillingPayment,downloadBillingInvoice } from './billing.js';
 import { loadRecommendations } from './recommendations.js';
 import { notify,dismissNotice } from './feedback.js';
 import { toggleNavigation } from './ui.js';
@@ -11,7 +12,7 @@ import { reserveDetail, stepDetailQuantity, updateDetailQuantity, openListingDet
 import { clearCart, confirmOrder, openCheckoutModal, removeCartItem, stepCartQuantity, changeCartQuantity } from './cart.js';
 import { markNotificationsRead, openNotificationOrder, markNotificationRead, openNotifications } from './notifications.js';
 import { verifyPickup, rejectOrder, openPickupVerification, changeOrder, openRejectOrder, loadMyOrders, setOrderTab } from './orders.js';
-import { changePassword, handleLogout, switchAuthMode, selectRole, handleLogin, openForgotPassword, handleSignup, openPasswordChange, requestPasswordReset, resetPassword } from './auth.js';
+import { changePassword, handleLogout, switchAuthMode, selectRole, handleLogin, handleAdminLogin, openForgotPassword, handleSignup, openPasswordChange, requestPasswordReset, resetPassword } from './auth.js';
 import { showScreen } from './router.js';
 import { toggleFavorite } from './favorites.js';
 import { openRestaurant, renderRestaurantMenu, loadRestaurant, renderRestaurants, loadRestaurants } from './restaurants.js';
@@ -22,6 +23,11 @@ import { loadTrainingData, downloadTrainingFile, resetTrainingImport, importTrai
 
 // Only these explicit actions can be invoked from static or generated markup.
 export const actions = {
+  loadBilling: () => loadBilling(),
+  openBillingInvoice: (event,node) => openBillingInvoice(Number(node.dataset.arg0)),
+  recordBillingPayment: event => recordBillingPayment(event),
+  voidBillingPayment: (event,node) => voidBillingPayment(event,node),
+  downloadBillingInvoice: () => downloadBillingInvoice(),
   loadRecommendations: () => loadRecommendations(),
   loadBusiness: () => loadBusiness(),
   dismissNotice: () => dismissNotice(),
@@ -87,6 +93,7 @@ export const actions = {
   switchAuthMode: (event, node) => switchAuthMode(node.dataset.arg0, node),
   selectRole: (event, node) => selectRole(node.dataset.arg0, node),
   handleLogin: (event, node) => handleLogin(event),
+  handleAdminLogin: (event, node) => handleAdminLogin(event),
   openForgotPassword: (event, node) => openForgotPassword(),
   handleSignup: (event, node) => handleSignup(event),
   switchBizTab: (event, node) => switchBizTab(node.dataset.arg0, node),

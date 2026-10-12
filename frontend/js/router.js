@@ -10,6 +10,7 @@ import { loadFavorites } from './favorites.js';
 import { ensureView, hasView, showLoadError } from './views.js';
 import { initHomeBanner } from './home.js';
 import { renderHomeReviews } from './reviews.js';
+import { loadBilling } from './billing.js';
 
 export function renderTopNav() {
   const controls = el('nav-controls');
@@ -18,10 +19,10 @@ export function renderTopNav() {
   const navButton = (screen, label) => '<button class="' + (navScreen === screen ? 'active' : '') +
     '" aria-current="' + (navScreen === screen ? 'page' : 'false') +
     '" data-click="showScreen" data-arg0="' + screen + '">' + label + '</button>';
-  const nav = '<div class="switch">' + navButton('home','Home') + navButton('customer','Browse Food') +
+  const nav = '<div class="switch">' + navButton('home','Home') + (state.currentUser?.role==='admin'?navButton('admin','Platform revenue'):navButton('customer','Browse Food')) +
     (state.currentUser?.role === 'customer' ? navButton('my-orders','My Orders') + navButton('favorites','Favorites') : '') +
     (state.currentUser?.role === 'business' ? navButton('business','Business Portal') : '') + '</div>';
-  const account=state.currentUser?'<button class="profile-nav-btn ' +
+  const account=state.currentUser?.role==='admin'?'<button class="profile-nav-btn" data-click="openPasswordChange">Change password</button><button class="logout-btn" data-click="handleLogout">Logout</button>':state.currentUser?'<button class="profile-nav-btn ' +
     (state.activeScreen==='profile'||state.activeScreen==='business'&&state.activeBusinessTab==='profile'?'active':'')+
     '" data-click="showScreen" data-arg0="profile">Profile</button><button class="logout-btn" data-click="handleLogout">Logout</button>':
     '<button class="btn-pri" data-click="showScreen" data-arg0="login">Sign In</button>';
@@ -29,19 +30,19 @@ export function renderTopNav() {
     '<div id="nav-menu" class="nav-menu">'+nav+account+'</div>' + (state.currentUser
     ? (state.currentUser.role === 'customer' ? '<button id="cart-open" class="cart-chip" data-click="openCheckoutModal">Cart (<span id="cart-count">' +
       state.cartItems.length + '</span>)</button>' : '') +
-      '<button class="notification-nav" data-click="openNotifications" aria-label="Notifications, '+state.unreadNotifications+' unread">Updates <span id="notification-count">'+state.unreadNotifications+'</span></button>' +
+      (state.currentUser.role==='admin'?'':'<button class="notification-nav" data-click="openNotifications" aria-label="Notifications, '+state.unreadNotifications+' unread">Updates <span id="notification-count">'+state.unreadNotifications+'</span></button>') +
       '' : '');
 }
 
 export const routes = Object.freeze({
   home: { init: () => { initHomeBanner(); renderHomeReviews(); return refreshMarketplace(); } },
-  login: {}, customer: { init: refreshMarketplace },
+  login: {}, 'admin-login': {}, customer: { init: refreshMarketplace },
   restaurants: { init: loadRestaurants }, restaurant: { init: loadRestaurant },
   'my-orders': { role: 'customer', init: loadMyOrders },
   favorites: { role: 'customer', init: loadFavorites },
   recovery: {}, 'reset-password': {},
   profile: { authenticated: true, init: renderProfile },
-  business: { role: 'business', init: loadBusiness }
+  business: { role: 'business', init: loadBusiness }, admin: { role: 'admin', init: loadBilling }
 });
 let navigation = 0;
 let requestedScreen = 'home';
@@ -51,13 +52,18 @@ let historyInstalled = false;
 
 export function resolveScreen(screen,options={}) {
   if (!Object.hasOwn(routes, screen)) return 'home';
-  if((routes[screen].role||routes[screen].authenticated)&&!state.currentUser)return 'login';
+  if((routes[screen].role||routes[screen].authenticated)&&!state.currentUser)return screen==='admin'?'admin-login':'login';
+  if(screen==='admin-login'&&state.currentUser)return state.currentUser.role==='admin'?'admin':state.currentUser.role==='business'?'business':'customer';
+  if(screen==='login'&&state.currentUser?.role==='admin')return 'admin';
   if (routes[screen].role && state.currentUser?.role !== routes[screen].role) {
+    if(state.currentUser?.role==='admin')return 'admin';
+    if(screen==='admin')return state.currentUser?.role==='business'?'business':'customer';
     return screen === 'business' ? 'customer' : 'login';
   }
   if (screen==='reset-password' && !state.resetPasswordToken) screen='recovery';
   if (screen === 'restaurant' && !(options.restaurantId||state.selectedRestaurantId)) screen = 'restaurants';
   if (screen==='profile' && state.currentUser?.role==='business') return 'business';
+  if (screen==='profile' && state.currentUser?.role==='admin') return 'admin';
   if (screen === 'profile' && !state.currentUser) screen = 'login';
   return screen;
 }
@@ -69,7 +75,7 @@ export async function showScreen(requested,options={}) {
   const session = state.token;
   const screen = resolveScreen(requested,options);
   const tab=requested==='profile'&&screen==='business'?'profile':businessTabs.includes(options.tab)?options.tab:'overview';
-  if(screen==='login'&&requested!=='login'&&!state.currentUser) returnAfterLogin={screen:requested,...options};
+  if(['login','admin-login'].includes(screen)&&requested!==screen&&!state.currentUser) returnAfterLogin={screen:requested,...options};
   try {
     if (!hasView(screen)) await ensureView(screen);
     if (version !== navigation || session !== state.token) return false;
@@ -110,6 +116,7 @@ export function clearReturnRoute() { returnAfterLogin=null; }
 export function navigateAfterLogin() {
   const target=returnAfterLogin;
   returnAfterLogin=null;
+  if(state.currentUser.role==='admin')return showScreen('admin',{historyMode:'replace'});
   return target?showScreen(target.screen,{...target,historyMode:'replace'}):
-    showScreen(state.currentUser.role==='business'?'business':'customer',{historyMode:'replace'});
+    showScreen(state.currentUser.role==='admin'?'admin':state.currentUser.role==='business'?'business':'customer',{historyMode:'replace'});
 }

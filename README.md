@@ -4,6 +4,12 @@ PlateUp is a surplus-food marketplace built to reduce food waste by helping busi
 
 This project is a full-stack web application with a PostgreSQL-backed backend and a lightweight HTML/CSS/JavaScript frontend. It focuses on the core marketplace flow: signup, listing creation, inventory tracking, reservations, order management, reviews, and sales reporting.
 
+PlateUp also tracks a **10% restaurant commission on all completed orders, including previous sales**,
+monthly billing statements, verified offline receipts and outstanding balances.
+Businesses use **Billing & invoices**; privately provisioned administrators use
+the **Platform revenue** dashboard. Demo receipts are separate from actual income.
+See [billing setup, administrator creation and demonstration steps](docs/platform-billing.md).
+
 ## Why this project exists
 
 Food businesses often have usable food left near closing time. Instead of letting it go to waste, PlateUp lets them publish it as a discounted listing and gives customers the ability to reserve it before pickup.
@@ -159,7 +165,8 @@ To add a screen, create its markup in `frontend/views/`, add its controlled path
 `page-urls.js` and the Express shell-route allowlist in `server/index.js` so direct
 visits work. Keep feature logic in its
 own module, reusing the API client and shared state. Login/signup remain one tabbed
-view; the existing business dashboard retains its tabs. No admin view is invented.
+view; the existing business dashboard retains its tabs, including Billing & invoices.
+The admin revenue view is protected by the existing JWT role checks.
 
 
 ## Prerequisites
@@ -293,7 +300,7 @@ These tests do not render CSS or replace a visual browser smoke test.
 
 This project is a functional MVP and still has several planned future improvements:
 
-- No admin dashboard
+- Admin revenue dashboard is available; general user management/moderation is not implemented
 - No full delivery logistics system
 - No dynamic rescue pricing engine
 - Pricing model is an academic prototype; recommendations are rule-based, with no real-world performance validation yet
@@ -323,5 +330,10 @@ Before making changes:
 This project is currently unlicensed unless explicitly stated otherwise.
 
 ## Additional project context
+
+Administrator access uses the separate `/admin/login` page. Public signup and
+sign-in support only customers and businesses. Create an administrator locally
+with `npm run admin:create`; see [Platform billing setup](docs/platform-billing.md)
+for the secure password prompt and account setup steps.
 
 Broader project documentation and planning materials may also exist in the repository, such as the SRS. Those documents describe the intended long-term system, but the repository itself remains the source of truth for what is currently implemented.

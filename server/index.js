@@ -13,6 +13,8 @@ const { registerCustomerExperience } = require('./customer-experience');
 const { registerTrainingData } = require('./training-data');
 const { registerPricing,refreshPrices,withPricingReadiness } = require('./pricing');
 const { registerRecommendations } = require('./recommendations');
+const { registerBilling,recordCommission,COMMISSION_RATE_BPS } = require('./billing');
+const { createAdminLoginLimit } = require('./admin-login-limit');
 require('dotenv').config();
 
 const app = express();
@@ -29,7 +31,7 @@ app.use('/uploads/food', express.static(foodUploadDir, { fallthrough:false,
 app.get(['/', '/login', '/browse-food', '/restaurants', '/restaurants/:id([1-9]\\d*)',
   '/orders', '/favorites', '/profile', '/forgot-password', '/reset-password',
   '/business', '/business/overview', '/business/listings', '/business/orders',
-  '/business/analytics', '/business/reviews', '/business/profile', '/business/training'],
+  '/business/analytics', '/business/reviews', '/business/profile', '/business/training', '/business/billing', '/admin', '/admin/login'],
   (_, res) => res.sendFile(path.join(frontendDir, 'index.html')));
 app.get('/UI_PlateUp.html', (_, res) => res.redirect('/'));
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -146,6 +148,7 @@ registerCustomerExperience(app,{auth,role,wrap,validId,listingSql,restaurantSql,
 registerTrainingData(app,{auth,role,wrap});
 registerPricing(app,{auth,role,wrap,validId});
 registerRecommendations(app,{auth,role,wrap,listingSql,viewerCitySql});
+registerBilling(app,{auth,role,wrap,validId});
 function publicOrder(order,user) {
   const { pickup_code,pickup_attempts,pickup_locked_until,...safe } = order;
   if (user.role==='customer' && user.userId===order.customer_id && ['pending','confirmed','ready'].includes(order.status))
@@ -219,17 +222,28 @@ app.post('/api/auth/signup', wrap(async (req, res) => {
   } finally { db.release(); }
 }));
 
-app.post('/api/auth/login', wrap(async (req, res) => {
-  const email = clean(req.body.email).toLowerCase();
-  const { password, role: kind } = req.body;
-  if (!email || !password || !kind) return res.status(400).json({ message: 'Email, password, and role are required' });
+const adminLoginLimit=createAdminLoginLimit();
+// Compare a bcrypt hash even for unknown accounts to avoid a fast account probe.
+const missingAccountHash=bcrypt.hashSync(crypto.randomBytes(32).toString('hex'),10);
+const signIn = administrator => wrap(async (req, res) => {
+  const email = clean(req.body?.email).toLowerCase();
+  const password=req.body?.password;
+  const kind=administrator?'admin':req.body?.role;
+  if (!email || typeof password!=='string' || !password || password.length>4096 ||
+    (!administrator&&!['customer','business'].includes(kind)))
+    return res.status(401).json({ message:'Invalid credentials' });
   const result = await pool.query("SELECT * FROM users WHERE email=$1 AND role=$2 AND status='active'", [email,kind]);
   const user = result.rows[0];
-  if (!user || !await bcrypt.compare(password,user.password_hash))
+  const matches=await bcrypt.compare(password,user?.password_hash||missingAccountHash);
+  if (!user || !matches)
     return res.status(401).json({ message: 'Invalid credentials' });
   const token = jwt.sign({ userId:user.id,email:user.email,role:user.role,version:user.auth_version },process.env.JWT_SECRET,{ expiresIn:'1h' });
+  if(administrator)adminLoginLimit.success(req);
   res.json({ token,user:{ id:user.id,name:user.name,email:user.email,role:user.role } });
-}));
+});
+const privateLogin=(req,res,next)=>{res.set('Cache-Control','no-store');next();};
+app.post('/api/auth/login',privateLogin,signIn(false));
+app.post('/api/auth/admin/login',privateLogin,adminLoginLimit.middleware,signIn(true));
 
 app.get('/api/me', auth, wrap(async (req,res) => {
   const result = await pool.query(`SELECT u.id,u.name,u.email,u.role,u.phone,u.status,u.created_at,
@@ -491,10 +505,10 @@ app.post('/api/orders', auth, role('customer'), wrap(async (req,res) => {
       }
       const total = Number(stock.rows[0].rescue_price)*quantity;
       const created = await db.query(`INSERT INTO orders
-        (customer_id,listing_id,daily_availability_id,quantity,total_price,payment_method,pickup_deadline)
-        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        (customer_id,listing_id,daily_availability_id,quantity,total_price,payment_method,pickup_deadline,commission_rate_bps)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
         [req.user.userId,listingId,stock.rows[0].id,quantity,total,
-          clean(req.body.payment_method,50)||'Pay at pickup',stock.rows[0].pickup_deadline]);
+          clean(req.body.payment_method,50)||'Pay at pickup',stock.rows[0].pickup_deadline,COMMISSION_RATE_BPS]);
       const order=created.rows[0];
       const code=order.id+'-'+crypto.randomBytes(3).toString('hex').toUpperCase();
       await db.query('UPDATE orders SET pickup_code=$1 WHERE id=$2',[code,order.id]);
@@ -549,7 +563,7 @@ app.patch('/api/orders/:id', auth, wrap(async (req,res) => {
       }
     }
     const updated=await db.query(`UPDATE orders SET status=$1::varchar,updated_at=NOW(),status_reason=$3,
-      pickup_time=CASE WHEN $1::varchar='completed' THEN NOW() ELSE pickup_time END,
+      pickup_time=CASE WHEN $1::varchar='completed' THEN CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Dhaka' ELSE pickup_time END,
       pickup_attempts=0,pickup_locked_until=NULL,
       payment_status=CASE WHEN $1::varchar='completed' AND payment_method='Pay at pickup' THEN 'paid'
       ELSE payment_status END WHERE id=$2 RETURNING *`,[next,order.id,rejection?reason:null]);
@@ -560,6 +574,7 @@ app.patch('/api/orders/:id', auth, wrap(async (req,res) => {
       (business_id,listing_id,order_id,quantity_sold,price) VALUES ($1,$2,$3,$4,$5)
       ON CONFLICT (order_id) DO NOTHING`,
       [order.business_id,order.listing_id,order.id,order.quantity,order.total_price]);
+    if (next==='completed') await recordCommission(db,{...order,...updated.rows[0]});
     await notifyOrder(db,customer?order.business_id:order.customer_id,order.id,next,
       'Reservation #'+order.id+' for '+order.listing_title+' is '+(next==='ready'?'ready for pickup':next)+'.'+(rejection?' Reason: '+reason:''));
     await db.query('COMMIT');
